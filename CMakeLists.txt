@@ -1,4 +1,6 @@
-cmake_minimum_required( VERSION 3.1 )
+# This sets CMP0074 to NEW.
+cmake_minimum_required(VERSION 3.12) # Or bigger version
+set(BUILD_SHARED_LIBS OFF)
 
 project( Maya )
 

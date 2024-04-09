@@ -9,11 +9,7 @@
 #   Maya_LIBRARYDIR
 
 # All the Maya libraries link with Foundation.
-set(
-    _maya_libraries
-    Foundation
-    ${Maya_FIND_COMPONENTS}
-    )
+set(_maya_libraries ${Maya_FIND_COMPONENTS})
 
 if ( NOT Maya_FIND_VERSION )
     message( FATAL_ERROR "Maya version is not specified." )
