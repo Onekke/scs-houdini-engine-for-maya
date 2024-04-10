@@ -29,14 +29,15 @@ proc string[] getHoudiniVersions()
 }
 
 global proc
-houdiniEngine_browseAssetLibrary()
-{
+houdiniEngine_browseAssetLibrary() {
+    string $directory = `python "import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir = os.path.join(pathdir, \"art_assets\", \"houdini\", \"packages\"); pathdir"`;
     string $filter = "Houdini Asset Library (*.otl *.hda *.otllc *.hdalc *.otlnc *.hdanc);;All Files (*.*)";
     string $results[] = `fileDialog2
         -caption "Browse Asset Library"
         -okCaption "Open"
         -fileFilter $filter
-        -fileMode 1`;
+        -fileMode 1
+        -startingDirectory $directory`;
     if(size($results) == 0)
     {
         return;
@@ -91,10 +92,15 @@ houdiniEngine_loadAssetLibrary(string $assetLibraryFilePath)
 global proc string
 houdiniEngine_loadAsset(string $assetLibraryFilePath, string $asset)
 {
+    string $directory = `python "import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir"`;
+    
+    string $filePathAbsolute = $assetLibraryFilePath;
+    string $filePathRelative = `substitute $directory $filePathAbsolute "%PRISM_PROJECT_PATH%"`;
+    
     houdiniEngine_addRecentAsset $assetLibraryFilePath $asset;
     houdiniEngineAssetLibraryManager_addLoadedFile $assetLibraryFilePath;
 
-    return `houdiniAsset -loadAsset $assetLibraryFilePath $asset`;
+    return `houdiniAsset -loadAsset $filePathRelative $asset`;
 }
 
 global proc
@@ -373,18 +379,16 @@ houdiniEngine_deleteSelectedHistory()
     catchQuiet(`select -replace $old_selection`);
 }
 
-global proc
-houdiniEngine_updateShelf()
-{
+global proc houdiniEngine_updateShelf() {
     // Note - don't put this command on the houdini shelf itself - it will crash
     if(`shelfLayout -exists "Houdini"`)
         deleteShelfTab "Houdini";
-    string $MODULE_PATH=`getModulePath -moduleName "houdiniEngine"`;
+    string $MODULE_PATH = `getModulePath -moduleName "houdiniEngine"`;
     if(!`shelfLayout -exists "Houdini"`)
         catchQuiet(loadNewShelf ($MODULE_PATH + "/scripts/shelf_Houdini"));
 }
 
-global proc
+/* global proc
 houdiniEngine_updateToolsShelf()
 {
     // Note - don't put this command on the Tools shelf itself - it will crash
@@ -399,10 +403,9 @@ houdiniEngine_updateToolsShelf()
     if(!`shelfLayout -exists "HoudiniTools"`)
         catchQuiet(houdiniEngine_buildToolsShelf ($toolsLocation));
        // catchQuiet(houdiniEngine_buildToolsShelf ($MODULE_PATH + "/../../tools/"));
-}
+} */
 
-global proc
-houdiniEngine_buildToolsShelf(string $toolsLocation)
+/* global proc houdiniEngine_buildToolsShelf(string $toolsLocation)
 {
     global string $gShelfTopLevel;
 
@@ -468,6 +471,56 @@ houdiniEngine_buildToolsShelf(string $toolsLocation)
                 -height 32;
         }
 
+    }
+} */
+
+global proc houdiniEngine_updatePackageShelf(string $packageName, string $packageDir) {
+    // Note - don't put this command on the Tools shelf itself - it will crash
+    if(`shelfLayout -exists ("Houdini" + $packageName)`)
+        deleteShelfTab ("Houdini" + $packageName);
+
+    string $PRISM_PROJECT_PATH = `python "import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir"`;
+
+    $packagePath = ($PRISM_PROJECT_PATH + "art_assets/houdini/packages/" + $packageDir);
+    if(!`shelfLayout -exists ("Houdini" + $packageName)`)
+        catchQuiet(houdiniEngine_buildPackageShelf ($packageName, $packagePath));
+}
+
+global proc houdiniEngine_buildPackageShelf(string $packageName, string $packagePath) {
+    global string $gShelfTopLevel;
+
+    // load an empty shelf to make sure that the deleted shelf is really gone
+    // just using addNewShelfTab with the same name would restore deleted items !!!
+    string $MODULE_PATH = `getModulePath -moduleName "houdiniEngine"`;
+    loadNewShelf ($MODULE_PATH + "/scripts/shelf_Houdini" + $packageName);
+
+    string $currentShelf = `tabLayout -query -selectTab $gShelfTopLevel`;
+    setParent $currentShelf;
+
+    string $hdas[] = `getFileList -folder ($packagePath + "/hda/") - filespec "*.hda"`;
+    //string $icons[] = `getFileList -folder ($packagePath + "/icons/") - filespec "*.png"`;
+
+    for($hda in $hdas) {
+        string $name = basename($hda, ".hda");
+        string $buffer[];
+        $numTokens = `tokenize $name "." $buffer`;
+        string $icon = $packagePath + "/icons/" + $buffer[0] + ".png";
+        print($icon + "\n");
+        string $path = ($packagePath + "/hda/" + $hda);
+        string $assets[] = `houdiniAsset -listAssets $path`;
+        
+        if(size($assets) == 0) continue;
+        
+        string $script = ("if(!`pluginInfo -query -loaded houdiniEngine`)\n     loadPlugin houdiniEngine;\nif(!`exists houdiniEngine_loadAsset`)\n     source houdiniEngineCreateUI;\n houdiniEngine_loadAsset \"" + $path + "\" \"" + $assets[0] + "\"");
+        
+        shelfButton
+            -command $script
+            -sourceType "mel"
+            -label $name
+            -image $icon
+            -style "iconOnly"
+            -width 32
+            -height 32;
     }
 }
 
@@ -736,31 +789,56 @@ houdiniEngineCreateUI()
 
     menuItem
         -label "Load Asset..."
+        -image "load_asset_24.png"
         -imageOverlayLabel "LA"
-        -annotation "Browse for assets or asset libraries"
+        -annotation "Browse for assets or asset libraries."
         -command "houdiniEngine_browseAssetLibrary";
 
     $recentAssetsMenu = `menuItem
         -label "Recent Assets"
-        -annotation "Load a recently used asset"
+        -image "recent_assets_24.png"
+        -imageOverlayLabel "RA"
+        -annotation "Load a recently used asset."
         -subMenu true`;
     setParent -menu ..;
 
     menuItem -label "Asset Library Manager"
         -imageOverlayLabel "ALM"
-        -annotation "See which libraries and which asset versions are loaded"
+        -annotation "See which libraries and which asset versions are loaded."
         -command "houdiniEngineAssetLibraryManager";
 
+    menuItem -divider true;
+
     menuItem -label "Update Houdini Shelf"
-        -imageOverlayLabel "UHS"
-        -annotation "Replace your old Houdini shelf with the  current version "
+        -imageOverlayLabel "UHDS"
+        -annotation "Replace your old Houdini Developer shelf with the latest version."
         -command "houdiniEngine_updateShelf";
 
-    menuItem -label "Update Houdini Tool Shelf"
-        -imageOverlayLabel "UTS"
-        -annotation "Rebuild your Tool shelf from the contents of the Tool directory "
-        -command "houdiniEngine_updateToolsShelf";
+    menuItem 
+        -label "Update Houdini Tools Shelf" 
+        -subMenu true 
+        -tearOff true;
+        
+        menuItem 
+            -label "Architecture"
+            -imageOverlayLabel "UHArcS"
+            -annotation "Rebuild your Houdini Artist shelf with architecture tools from the contents of the scs_prod_architecture directory."
+            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_prod_architecture\"";
 
+        menuItem 
+            -label "Dev Architecture"
+            -imageOverlayLabel "UHDevArcS"
+            -annotation "Rebuild your Houdini Artist shelf with architecture tools from the contents of the scs_dev_architecture directory."
+            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_dev_architecture\"";
+
+        menuItem 
+            -label "Shared"
+            -imageOverlayLabel "UHDevArcS"
+            -annotation "Rebuild your Houdini Artist shelf with shared tools from the contents of the scs_dev_shared directory."
+            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_dev_shared\"";
+        
+        setParent -menu ..;
+    /*
     menuItem -divider true;
 
     menuItem -label "Orbolt Asset Browser"
@@ -772,20 +850,11 @@ houdiniEngineCreateUI()
     menuItem -label "Get Assets from Orbolt"
         -imageOverlayLabel "GOB"
         -annotation "Visit the asset store to download assets for use in Maya"
-        -command "houdiniEngine_launchOrboltPageClick";
+        -command "houdiniEngine_launchOrboltPageClick"; */
 
     menuItem -divider true;
 
-    menuItem -label "Sync Asset"
-        -imageOverlayLabel "SA"
-        -annotation "Delete existing output nodes and rebuild the output hierarchy for the asset's current outputs"
-        -command "houdiniEngine_syncSelectedAsset";
-    menuItem -label "Bake Asset"
-        -imageOverlayLabel "BA"
-        -annotation "Tear off a copy of the asset's current output nodes"
-        -command "houdiniEngine_bakeSelectedAssets";
-
-    if( getApplicationVersionAsFloat() >= 2016.5 )
+    /* if( getApplicationVersionAsFloat() >= 2016.5 )
     {
         menuItem -label "Freeze Asset"
             -imageOverlayLabel "BA"
@@ -797,23 +866,47 @@ houdiniEngineCreateUI()
             -version $mayaVersion
             -annotation "Reconnect the asset's output nodes and mark the asset unfrozen"
             -command "houdiniEngine_unfreezeSelectedAssets";
-    }
+    } */
+
     menuItem -label "Remove Asset From History"
+        -image "remove_node.png"
         -imageOverlayLabel "RAH"
-        -annotation "Remove this asset and its inputGeometry nodes and reconnect history across the gap"
+        -annotation "Remove this asset and its inputGeometry nodes and reconnect history across the gap."
         -command "houdiniEngine_removeSelectedHistory";
+
     menuItem -label "Add Asset To Mesh History"
+        -image "add_node.png"
         -imageOverlayLabel "AAH"
-        -annotation "Apply the selected asset as construction history to the selected mesh"
+        -annotation "Apply the selected asset as construction history to the selected mesh."
         -command "houdiniEngine_addSelectedHistory";
-    menuItem -label "Delete History"
-        -imageOverlayLabel "DH"
-        -annotation "Delete construction history including any houdiniAsset nodes\n"
-        -command "houdiniEngine_deleteSelectedHistory";
+
+    menuItem -label "Bake Asset"
+        -image "duplicate_node.png"
+        -imageOverlayLabel "BA"
+        -annotation "Sync the selected asset, then tear off a copy of its output nodes."
+        -command "houdiniEngine_bakeSelectedAssets";
+
+    menuItem -divider true;
+
+    menuItem -label "Sync Asset"
+        -image "sync_asset.png"
+        -imageOverlayLabel "SA"
+        -annotation "Recreate all the parameters and output nodes of the selected assets."
+        -command "houdiniEngine_syncSelectedAsset";
+
     menuItem -label "Reload Asset"
+        -image "reload_asset.png"
         -imageOverlayLabel "RA"
-        -annotation "Reload the definition of the selected asset"
+        -annotation "Reload the asset definition for the selected assets.\nNote that other nodes using the same asset definition will not update until forced to cook (and then sync)."
         -command "houdiniEngine_reloadSelectedAssets";
+
+    menuItem -divider true;
+
+    menuItem -label "Delete Asset"
+        -image "delete_asset.png"
+        -imageOverlayLabel "DH"
+        -annotation "Delete construction history, including any asssets, from this node."
+        -command "houdiniEngine_deleteSelectedHistory";
 
     menuItem -divider true;
 
@@ -824,12 +917,12 @@ houdiniEngineCreateUI()
 
         menuItem -label "View Assets in Houdini"
             -imageOverlayLabel "VAH"
-            -annotation "Start houdini and load the current assets along with any input geometry"
+            -annotation "Start houdini and load the current assets along with any input geometry."
             -command "houdiniEngine_viewInHoudini";
 
         menuItem -label "Save Assets to Houdini Scene..."
             -imageOverlayLabel "SHS"
-            -annotation "Save the current assets and input geometry to a houdini scene"
+            -annotation "Save the current assets and input geometry to a houdini scene."
             -command "houdiniEngine_saveHipFile";
 
     setParent -menu ..;
@@ -837,7 +930,7 @@ houdiniEngineCreateUI()
     menuItem -divider true;
 
     menuItem -label "Preferences..."
-        -annotation "Set the session type and non-asset specific options"
+        -annotation "Set the session type and non-asset specific options."
         -command "houdiniEnginePreferences";
 
     menuItem
@@ -847,17 +940,17 @@ houdiniEngineCreateUI()
 
         menuItem -label "Hide All Assets in Outliner"
             -imageOverlayLabel "HAO"
-            -annotation "Mark all asset nodes as hidden in the outliner"
+            -annotation "Mark all asset nodes as hidden in the outliner."
             -command "houdiniEngine_showOutliner 0 0";
 
         menuItem -label "Hide History Assets in Outliner"
             -imageOverlayLabel "HHO"
-            -annotation "Mark all history asset nodes as hidden in the outliner"
+            -annotation "Mark all history asset nodes as hidden in the outliner."
             -command "houdiniEngine_showOutliner 0 1";
 
         menuItem -label "Show All Assets in Outliner"
             -imageOverlayLabel "SAO"
-            -annotation "Mark all asset nodes as visible in the outliner"
+            -annotation "Mark all asset nodes as visible in the outliner."
             -command "houdiniEngine_showOutliner 1 0";
 
     setParent -menu ..;
@@ -908,3 +1001,4 @@ houdiniEngineCreateUI()
             + " \"" + $recentAssetsMenu + "\"")
         $recentAssetsMenu;
 }
+

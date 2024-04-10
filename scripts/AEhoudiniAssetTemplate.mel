@@ -3,9 +3,9 @@ source houdiniEngineAssetInput;
 source houdiniEngineHistoryAsset;
 source houdiniEngineBakeAsset;
 
-global proc
-AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug)
-{
+global int $gAttributeEditorTemplateLabelWidthCustom = 147;
+
+global proc AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug) {
     string $categories[] = `addAttr -q -category ($plug)`;
 
     string $fileFilter = "*.*(*.*)";
@@ -42,43 +42,29 @@ AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug)
     }
 }
 
-global proc AEhoudiniAssetTemplate_setComponentSelection(string $plug, string $componentType)
-{
+global proc AEhoudiniAssetTemplate_setComponentSelection(string $plug, string $componentType) {
     string $components = `python("from houdiniEngineSelection import get_selected_components; " + 
                                  "get_selected_components(\'" + $componentType + "\')")`;
 
     setAttr -type "string" $plug $components;
 }
 
-global proc
-AEhoudiniAssetTemplate_textEdit(string $plug)
-{
-    string $window = stringArrayToString(
-            stringToStringArray(
-                "houdiniEngine_textEdit_" + $plug,
-                "|."
-                ),
-            "_");
+global proc AEhoudiniAssetTemplate_textEdit(string $plug, string $title, int $editable) {
+    string $window = stringArrayToString(stringToStringArray("houdiniEngine_textEdit_" + $title, "|."), "_");
 
-    if(`window -exists $window`)
-    {
+    if(`window -exists $window`) {
         showWindow $window;
         return;
     }
 
     window
-        -title $plug
+        -title $title
         $window;
 
     string $mainLayout = `formLayout`;
 
-    string $descriptionText = `text
-        -label ("Editing: " + $plug)
-        -align "left"`;
-
     string $currentText = `getAttr $plug`;
-    string $scrollField = `scrollField
-        -text $currentText`;
+    string $scrollField = `scrollField -text $currentText`;
 
     scrollField -e
         -enterCommand ("setAttr -type \"string\" " + $plug + " "
@@ -89,8 +75,9 @@ AEhoudiniAssetTemplate_textEdit(string $plug)
 
     button
         -label "Apply"
+        -enable $editable
         -command ("setAttr -type \"string\" " + $plug + " "
-                + "`scrollField -q -text " + $scrollField + "`")
+                + "`scrollField -q -text " + $scrollField + "`" + "; evalDeferred \"deleteUI " + $window + "\"")
         applyButton;
     button
         -label "Cancel"
@@ -115,11 +102,7 @@ AEhoudiniAssetTemplate_textEdit(string $plug)
     setParent ..;
 
     formLayout -e
-        -attachForm $descriptionText "top" 5
-        -attachForm $descriptionText "left" 5
-        -attachForm $descriptionText "right" 5
-
-        -attachControl $scrollField "top" 5 $descriptionText
+        -attachForm $scrollField "top" 5
         -attachForm $scrollField "left" 5
         -attachControl $scrollField "bottom" 5 $buttonLayout
         -attachForm $scrollField "right" 5
@@ -132,8 +115,7 @@ AEhoudiniAssetTemplate_textEdit(string $plug)
     showWindow $window;
 }
 
-proc createInputWidget(string $attr, string $label)
-{
+proc createInputWidget(string $attr, string $label) {
     string $inputLayout = $attr + "Layout";
     $inputLayout = substituteAllString($inputLayout, "|", "_");
     $inputLayout = substituteAllString($inputLayout, ".", "_");
@@ -141,24 +123,30 @@ proc createInputWidget(string $attr, string $label)
     $inputLayout = substituteAllString($inputLayout, "]", "_");
     string $inputLayoutFull = `setParent -q` + "|" + $inputLayout;
 
-    text -align left -label $label;
+    //text -align left -label $label;
+    int $isEnabled =  (`getAttr -lock $attr` == 1) ? 0 : 1 ;
 
     rowLayout
         -numberOfColumns 2
         -adjustableColumn 1
-        -columnAlign  1 "right"
-        -columnAttach 1 "both"     2
-        -columnAttach 2 "left"  2
+        -columnAttach 1 "both" 0
+        -columnAttach 2 "left" 0
         $inputLayout;
 
         string $inputTextFieldFull = ($inputLayoutFull + "|inputTextField");
-        textField
-            -alwaysInvokeEnterCommandOnReturn true
-            -enterCommand ("AEhoudiniAssetSetInputToText \"" + $inputTextFieldFull + "\" \""
-             + $attr + "\"")
+        textFieldGrp
+            -enable $isEnabled
+            -label $label
+            -changeCommand ("AEhoudiniAssetSetInputToText \"" + $inputTextFieldFull + "\" \"" 
+                + $attr + "\"") 
             "inputTextField";
-        button
-            -label "Set to Selection"
+
+        iconTextButton
+            -enable $isEnabled 
+            -style "iconOnly" -image "object_NEX.png"
+            -label "Set to Selection" 
+            -h 20 -w 20
+            -annotation "Set input field to selected object."
             -command ("AEhoudiniAssetSetInputToSelection \"" + $attr + "\"");
 
     setParent ..;
@@ -166,10 +154,273 @@ proc createInputWidget(string $attr, string $label)
     scriptJob
         -parent $inputLayoutFull
         -replacePrevious
-        -attributeChange $attr
-        ("AEhoudiniAssetUpdateInput \"" + $inputLayoutFull + "\" \"" + $attr + "\"");
+        -attributeChange $attr ("AEhoudiniAssetUpdateInput \"" + $inputLayoutFull + "\" \"" 
+            + $attr + "\"");
 
     AEhoudiniAssetUpdateInput $inputLayoutFull $attr;
+}
+
+proc createButtonParm(string $attr, string $label, int $enable, string $annotation) {
+    global int $gAttributeEditorTemplateLabelWidthCustom;
+    
+    columnLayout
+        -height 27
+        -columnAttach "both" $gAttributeEditorTemplateLabelWidthCustom;
+        
+        button
+            -enable $enable
+            -height 20 -width 148
+            -label $label 
+            -command ("setAttr " + $attr + " 1")
+            -annotation $annotation;
+        
+        setParent ..;
+}
+
+proc createFileInputStringParm(string $attr, string $label, int $enable, string $annotation) {
+    string $text = `getAttr $attr`;
+
+    rowLayout
+        -numberOfColumns 2
+        -adjustableColumn 1
+        -columnAttach 1 "both" 0
+        -columnAttach 2 "left" 0;
+
+        string $textField = `textFieldGrp
+            -enable $enable
+            -label $label
+            -text $text
+            -annotation $annotation`;
+
+        string $iconTextButton = `iconTextButton 
+            -enable $enable
+            -height 20 -width 20
+            -style "iconOnly" 
+            -image "fileOpen.png"
+            -label "Open File" 
+            -annotation "Open file browser."`;
+
+        setParent ..;
+
+    textFieldGrp -e
+        -changeCommand ("setAttr -type \"string\" \"" + $attr + "\" `textFieldGrp -q -text " + $textField + "`")
+        $textField;
+
+    iconTextButton -e 
+        -command ("AEhoudiniAssetTemplate_fileAttributeBrowse \"" + $attr + "\"")
+        $iconTextButton;
+
+    scriptJob
+        -parent $textField
+        -attributeChange $attr ("textFieldGrp -e -text `getAttr " + $attr + "` \"" + $textField + "\"");
+}
+
+proc createPrimSelectionParm(string $attr, string $label, int $enable, string $annotation, string $selectionType, int $selectionIndex) {
+    string $selectionIcons[] = {
+        "UVTkVertex.png",
+        "UVTkFace.png", 
+        "UVTkEdge.png", 
+        "UVTkUV.png"};
+    string $selectionHelp[] = {
+        "Set input field to selected vertices.",
+        "Set input field to selected faces.",
+        "Set input field to selected edges.",
+        "Set input field to selected uvs."};
+
+    string $text = `getAttr $attr`;
+
+    rowLayout
+        -numberOfColumns 2
+        -adjustableColumn 1
+        -columnAttach 1 "both" 0
+        -columnAttach 2 "left" 0;
+
+        string $textField = `textFieldGrp
+            -enable $enable
+            -label $label
+            -text $text
+            -annotation $annotation`;
+
+        string $iconTextButton = `iconTextButton 
+            -enable $enable
+            -height 20 -width 20
+            -style "iconOnly" 
+            -image ($selectionIcons[$selectionIndex])
+            -label "Set to Selection" 
+            -annotation ($selectionHelp[$selectionIndex])
+            -command ("AEhoudiniAssetTemplate_setComponentSelection \"" + $attr + "\" \"" + $selectionType + "\"")`;
+
+        setParent ..;
+
+    // Value changed in UI callback. Update engine.
+    textFieldGrp -e
+        -changeCommand ("setAttr -type \"string\" \"" + $attr + "\" `textFieldGrp -q -text " + $textField + "`")
+        $textField;
+
+    // Value changed in engine callback. Update UI.
+    scriptJob
+        -parent $textField
+        -attributeChange $attr ("textFieldGrp -e -text `getAttr " + $attr + "` \"" + $textField + "\"");
+}
+
+proc createStringParm(string $attr, string $attrName, string $label, int $enable, string $annotation, string $parmName) {
+    string $textTypes[] = {
+        "__info__", 
+        "__warning__", 
+        "__error__"};
+    string $textIcons[] = {
+        "info.png", 
+        "warningIcon.svg", 
+        "error.png", 
+        "greasePencilPencil.png"};
+
+    int $iconIndex = 3;
+    int $isEditable = 1;
+    string $labelButton = "Edit";
+    string $annotationButton = "Edit text field.";
+
+    for ($i = 0; $i < size($textTypes); $i++) {
+        if (endsWith($parmName, $textTypes[$i])) {
+            $iconIndex = $i;
+            $isEditable = 0;
+            $labelButton = "Read";
+            $annotationButton = "Open text field window.";
+            break;
+        }
+    }
+
+    string $text = `getAttr $attr`;
+
+    rowLayout
+        -numberOfColumns 2
+        -adjustableColumn 1
+        -columnAttach 1 "both" 0
+        -columnAttach 2 "left" 0;
+
+        string $textField = `textFieldGrp
+            -enable $enable
+            -editable $isEditable
+            -label $label
+            -text $text
+            -annotation $annotation`;
+
+        string $iconTextButton = `iconTextButton 
+            -enable $enable
+            -height 20 -width 20
+            -style "iconOnly" 
+            -image ($textIcons[$iconIndex])
+            -label $labelButton
+            -annotation $annotationButton
+            -command ("AEhoudiniAssetTemplate_textEdit \"" + $attr + "\" \"" + $attrName + "\" " + $isEditable)`;
+
+        setParent ..;
+
+    // Value changed in UI callback. Update engine.
+    textFieldGrp -e
+        -changeCommand ("setAttr -type \"string\" \"" + $attr + "\" `textFieldGrp -q -text " + $textField + "`")
+        $textField;
+
+    // Value changed in engine callback. Update UI.
+    scriptJob
+        -parent $textField
+        -attributeChange $attr ("textFieldGrp -e -text `getAttr " + $attr + "` \"" + $textField + "\"");
+}
+
+proc createMultiParm(string $attr, string $child, string $suffix, string $fullAttr, string $nodeName, string $annotation) {
+    string $multiAttr = substring($child, 1, size($child) - size($suffix));
+    string $multiFullAttr = $fullAttr + "." + $multiAttr;
+    string $multiFullName = substring($attr, 1, size($attr) - size($suffix)) + "[" + 0 + "]";
+
+    int $isParentEnabled = 1;
+    if (attributeExists($multiAttr, $nodeName)) {
+        string $multiChildren[] = `attributeQuery -node $nodeName -listChildren $multiAttr`;
+        for($multiChild in $multiChildren) {
+            int $isParentEnabled = (`getAttr -lock ($multiFullName + "." + $multiChild)` == 1) ? 0 : 1 ;
+            if ($isParentEnabled == 0) {
+                break;
+            }
+        }
+    }
+
+    columnLayout
+        -adjustableColumn true
+        -rowSpacing 2;
+
+        string $parent = `setParent -q`;
+
+        // attributeEditorTemplate messes up layout, so pop out of it temporarily
+        setUITemplate -popTemplate;
+
+        rowLayout
+            -numberOfColumns 4
+            -columnAttach 1 "both" 0
+            -columnAttach 2 "both" 2
+            -columnAttach 3 "both" 2
+            -columnAttach 4 "both" 2;
+
+            attrControlGrp
+                -enable $isParentEnabled
+                -attribute $attr
+                -annotation $annotation
+                // Forcing evaluation here ensures the element attribute is
+                // created before houdiniAssetAdjustMulti() is executed. This
+                // prevents the UI from a completel rebuild when
+                // houdiniAssetAdjustMulti() accesses the new element.
+                -changeCommand ("dgeval " + $nodeName + ".output; houdiniAssetAdjustMulti \\\"" + $parent + "\\\" \\\"" + $nodeName + "\\\" \\\"" + $multiAttr + "\\\" \\\"" + $multiFullAttr + "\\\"");           
+
+            button
+                -enable $isParentEnabled
+                -label "+"
+                -height 20 -width 20
+                -annotation "Add multiparm element."
+                -command ("setAttr " + $attr + " (`getAttr " + $attr + "` + 1)");
+            
+            button
+                -enable $isParentEnabled
+                -label "-"
+                -height 20 -width 20
+                -annotation "Remove multiparm element."
+                -command ("setAttr " + $attr + " (`getAttr " + $attr + "` - 1)");
+
+            button
+                -enable $isParentEnabled
+                -label "Clear"
+                -height 20 -width 40
+                -annotation "Remove all multiparm elements."
+                -command ("setAttr " + $attr + " 0");
+
+            setParent ..;
+
+        setUITemplate -pushTemplate attributeEditorTemplate;
+
+        houdiniAssetAdjustMulti($parent, $nodeName, $multiAttr, $multiFullAttr);
+
+        setParent ..;
+}
+
+proc createRampParm(string $attr, string $label) {
+    string $parent = `setParent -q`;
+    rowLayout
+        -numberOfColumns 2
+        -columnWidth1 147
+        -adjustableColumn 2;
+        
+        text 
+            -label $label
+            -align "right";
+        setParent ..;
+    setParent $parent;
+
+    columnLayout
+        -adjustableColumn true
+        -columnAttach "left" 22;
+
+        AEmakeLargeRamp($attr, 0, 0, 0, 0, 0);
+
+        // Workaround layout issue in AE where AEmakeLargeRamp doesn't
+        // correctly restore parent.
+        setParent ..;
+    setParent $parent;
 }
 
 proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
@@ -179,16 +430,29 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
     // Using for-in loop with the attributeQuery result directly crashes Maya.
     // This is most likely a MEL bug. Workaround it by first storing the result
     // into a string array.
-    //for($child in `attributeQuery
-    //    -node $nodeName
-    //    -listChildren $attr`)
-    string $children[] = `attributeQuery -node $nodeName -listChildren $attr`;
-    for($child in $children)
-    {
-        int $isFolder = endsWith($child, "__folder");
+    //for($child in `attributeQuery -node $nodeName -listChildren $attr`)
 
+    string $children[] = `attributeQuery -node $nodeName -listChildren $attr`;
+    for($child in $children) {
+        // Fix for Maya fatal error from compound attributes without children 
+        if (`match "__dummy__" $child` == "__dummy__") {
+            continue;
+        }
+
+        if ( `match "sepparm" $child` == "sepparm") {
+            separator -height 12 -style "in";
+            continue;
+        } else if ( `match "spacer" $child` == "spacer") {
+            separator -height 12 -style "none" -backgroundColor 0.285 0.285 0.285;
+            continue;
+        }
+        
+        string $plug = $fullAttrName + "." + $child;
+        
         // get info about parm
-        string $type = `getAttr -type ($fullAttrName + "." + $child)`;
+        string $type = `getAttr -type $plug`;
+        
+        int $isFolder = endsWith($child, "__folder");
         int $isCompound = ($type == "TdataCompound");
         int $isMulti = `attributeQuery -node $nodeName -multi $child`;
         int $isRamp = endsWith($child, "__ramp");
@@ -196,299 +460,134 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
         string $multiparm_suffix = "__multiSize";
         int $isMultiSize = endsWith($child, $multiparm_suffix);
 
-        // get parm help string
+        int $isSimpleAttribute = `attrControlGrp -q -handlesAttribute $plug` && !$isMultiSize && !$isFolder;
+        
+        int $isEnabled =  (`getAttr -lock $plug` == 1) ? 0 : 1 ;
+
         string $parmName = stringRemovePrefix($child, "houdiniAssetParm_");
         string $parmHelp = `houdiniAsset -parmHelp $parmName $nodeName`;
-
-        int $isSimpleAttribute = `attrControlGrp -q -handlesAttribute ($fullAttrName + "." + $child)`
-            && !$isMultiSize
-            // We need to make sure this is not a folder. There could be
-            // folders that look like a float3 attribute, and -handlesAttribute
-            // will return true.
-            && !$isFolder;
-
-        string $plug = $fullAttrName + "." + $child;
+        string $niceName = `attributeQuery -node $nodeName -niceName $child`;
+        
         string $categories[] = `addAttr -q -category ($plug)`;
 
-        // separator
-        if($type == ""
-                && `attributeQuery -node $nodeName -niceName $child` == "Separator")
-        {
-            separator;
-        }
-        else if(endsWith($child, "__button"))
-        {
-            string $niceName = `attributeQuery -node $nodeName -niceName $child`;
-            button -label $niceName -command ("setAttr " + $fullAttrName + "." + $child + " 1")
-                   -annotation $parmHelp;
-        }
-        else if(endsWith($child, "__node"))
-        {
-            string $niceName = `attributeQuery -node $nodeName -niceName $child`;
-            createInputWidget($fullAttrName + "." + $child, $niceName);
-        }
-        // simple attributes
-        else if($isSimpleAttribute)
-        {
-            if($type == "string"
-                    && `addAttr -q -usedAsFilename ($fullAttrName + "." + $child)`)
-            {
-                string $niceName = `attributeQuery -node $nodeName -niceName $child`;
-                string $text = `getAttr ($fullAttrName + "." + $child)`;
-
-                string $textField = `textFieldButtonGrp
-                    -label $niceName
-                    -buttonLabel "..."
-                    -text $text
-                    -annotation $parmHelp`;
-
-                scriptJob
-                    -parent $textField
-                    -attributeChange ($fullAttrName + "." + $child)
-                    ("textFieldButtonGrp -e -text `getAttr " + $fullAttrName + "." + $child + "`"
-                     + " \"" + $textField + "\"");
-                textFieldButtonGrp -e
-                    -changeCommand ("setAttr -type \"string\""
-                            + " \"" + $fullAttrName + "." + $child + "\""
-                            + " `textFieldButtonGrp -q -text " + $textField + "`")
-                    -buttonCommand ("AEhoudiniAssetTemplate_fileAttributeBrowse "
-                            + "\"" + ($fullAttrName + "." + $child) + "\"")
-                    $textField;
-            }
-            else if($type == "string")
-            {
-                string $niceName = `attributeQuery -node $nodeName -niceName $child`;
-                string $text = `getAttr ($plug)`;
-
-                string $textField = "";
-
-                int    $treatAsSelection = false;
+        if(endsWith($child, "__button")) {
+            createButtonParm($plug, $niceName, $isEnabled, $parmHelp);
+        
+        } else if(endsWith($child, "__node")) {
+            createInputWidget($plug, $niceName);
+        
+        } else if($isSimpleAttribute) {
+            if (`addAttr -q -usedAsFilename $plug`) {   
+                createFileInputStringParm($plug, $niceName, $isEnabled, $parmHelp);
+            
+            } else if ($type == "string") {
+                string $supportedSelectionTypes[] = {"vertex", "face", "edge", "uv"};
+                
                 string $selectionType = "";
-                string $niceSelectionType = "";
+                int $selectionIndex = -1;
+                int $treatAsSelection = false;
 
                 // See if we need to handle this string parm differently
-                for ($category in $categories)
-                {
+                for ($category in $categories) {
                     string $prefix = "hapiParmString_select";
 
-                    if (startsWith($category, $prefix))
-                    {
+                    if (startsWith($category, $prefix)) {
                         $selectionType = tolower(stringRemovePrefix($category, $prefix));
+                        $selectionIndex = stringArrayFind($selectionType, 0, $supportedSelectionTypes);
 
-                        if ($selectionType == "vertex")
-                        {
-                            $niceSelectionType = "Vertices";
+                        if ($selectionIndex >= 0) {
+                            $treatAsSelection = true;
+                            // We don't support multiple selection types, so bail out here.
+                            break;
                         }
-                        else if ($selectionType == "edge")
-                        {
-                            $niceSelectionType = "Edges";
-                        }
-                        else if ($selectionType == "face")
-                        {
-                            $niceSelectionType = "Faces";
-                        }
-                        else if ($selectionType == "uv")
-                        {
-                            $niceSelectionType = "UVs";
-                        }
-                        else
-                        {
-                            // Fall back to a traditional string attribute
-                            warning("Unknown selection type \"" + $selectionType +
-                                    "\" on \"" + $plug + "\". This attribute " +
-                                    "will be interpreted as a normal string.");
-
-                            // There still may be a valid selection type provided
-                            // in another category. Keep looking.
-                            continue;
-                        }
-
-                        $treatAsSelection = true;
-
-                        // We don't support multiple selection types, so bail
-                        // out here.
-                        break;
                     }
                 }
 
-                if ($treatAsSelection == true)
-                {
-                    $textField = `textFieldButtonGrp
-                        -label $niceName
-                        -buttonLabel ("Use Selected " + $niceSelectionType)
-                        -text $text`;
+                if ($treatAsSelection == true) {
+                    createPrimSelectionParm($plug, $niceName, $isEnabled, $parmHelp, $selectionType, $selectionIndex);
 
-                    textFieldButtonGrp -e
-                        -buttonCommand ("AEhoudiniAssetTemplate_setComponentSelection "
-                                + "\"" + $fullAttrName + "." + $child + "\" "
-                                + "\"" + $selectionType + "\"")
-                        $textField;
+                } else {
+                    createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName);
                 }
-                else
-                {
-                    $textField = `textFieldButtonGrp
-                        -label $niceName
-                        -buttonLabel "Edit"
-                        -text $text`;
+ 
+            } else if ($type == "float3") {
+                colorSliderGrp
+                    -label $niceName
+                    -annotation $parmHelp
+                    -enable $isEnabled;
 
-                    textFieldButtonGrp -e
-                        -buttonCommand ("AEhoudiniAssetTemplate_textEdit "
-                                + "\"" + $fullAttrName + "." + $child + "\"")
-                        $textField;
-                }
-
-                // Set annotation
-                textFieldButtonGrp -e -annotation $parmHelp $textField;
-
-                // Value changed in UI callback. Update engine.
-                textFieldButtonGrp -e
-                    -changeCommand ("setAttr -type \"string\""
-                            + " \"" + $fullAttrName + "." + $child + "\""
-                            + " `textFieldButtonGrp -q -text " + $textField + "`")
-                    $textField;
-
-                // Value changed in engine callback. Update UI.
-                scriptJob
-                    -parent $textField
-                    -attributeChange ($fullAttrName + "." + $child)
-                    ("textFieldButtonGrp -e -text `getAttr " + $fullAttrName + "." + $child + "`"
-                    + " \"" + $textField + "\"");
+            } else {
+                attrControlGrp 
+                    -attribute $plug
+                    -annotation $parmHelp
+                    -enable $isEnabled;
             }
-            else
-            {
-                attrControlGrp -attribute ($fullAttrName + "." + $child)
-                               -annotation $parmHelp;
+
+        } else if($isCompound && !$isMulti) {
+            int $collapsed = (`match "__open__" $parmName` == "__open__") ? 0 : 1;
+
+            float $color = 0.23;
+
+            if (`match "__lv1__" $parmName` == "__lv1__") {
+                $color = 0.26;
             }
-        }
-        // a folder is represented by a compound attribute
-        else if($isCompound && !$isMulti)
-        {
-            string $niceName = `attributeQuery -node $nodeName -niceName $child`;
+
+            separator -height 2 -style "none" -backgroundColor 0.285 0.285 0.285;
 
             frameLayout
                 -collapsable true
-                -collapse false
-                -label $niceName;
-            columnLayout
-                -adjustableColumn true;
+                -collapse $collapsed
+                -label $niceName
+                -backgroundColor $color $color $color
+                -font "plainLabelFont";
 
-            buildAttrTree($nodeName, $child, $fullAttr + "." + $child);
+                columnLayout
+                    -adjustableColumn true;
 
-            setParent ..;
-            setParent ..;
-        }
-        else if($isCompound && $isMulti && $isRamp)
-        {
-            string $niceName = `attributeQuery -node $nodeName -niceName $child`;
+                    buildAttrTree($nodeName, $child, $fullAttr + "." + $child);
 
-            frameLayout
-                -collapsable true
-                -collapse false
-                -label $niceName;
-            columnLayout
-                -adjustableColumn true;
+                    setParent ..;
+                setParent ..;
 
-            string $parent = `setParent -q`;
-
-            AEmakeLargeRamp($fullAttrName + "." + $child, 0, 0, 0, 0, 0);
-
-            // Workaround layout issue in AE where AEmakeLargeRamp doesn't
-            // correctly restore parent.
-            setParent $parent;
-            setParent ..;
-            setParent ..;
-        }
-        // a multiparm is represented by a "multiSize" attribute and a multi compound attribute
-        else if($isCompound && $isMulti && !$isRamp)
-        {
+        } else if($isCompound && $isMulti && $isRamp) {
+            createRampParm(($nodeName + "." + $child), $niceName);
+            
+        } else if($isCompound && $isMulti && !$isRamp) {
+            // a multiparm is represented by a "multiSize" attribute and a multi compound attribute
             // the actual UI for the multiparm attribute is generated when checking "multiSize"
-        }
-        else if($isMultiSize)
-        {
-            string $multiAttr = substring($child, 1, size($child) - size($multiparm_suffix));
-            string $multiFullAttr = $fullAttr + "." + $multiAttr;
-
-            string $multiNiceName = `attributeQuery -node $nodeName -niceName $child`;
-
-            frameLayout
-                -collapsable true
-                -label $multiNiceName;
-            columnLayout
-                -adjustableColumn true;
-
-            string $parent = `setParent -q`;
-
-            // attributeEditorTemplate messes up layout, so pop out of it temporarily
-            setUITemplate -popTemplate;
-
-            rowLayout
-                -numberOfColumns 3;
-
-            attrControlGrp
-                -attribute ($fullAttrName + "." + $child)
-                -annotation $parmHelp
-                // Forcing evaluation here ensures the element attribute is
-                // created before houdiniAssetAdjustMulti() is executed. This
-                // prevents the UI from a completel rebuild when
-                // houdiniAssetAdjustMulti() accesses the new element.
-                -changeCommand ("dgeval " + $nodeName + ".output; houdiniAssetAdjustMulti \\\"" + $parent + "\\\" \\\"" + $nodeName + "\\\" \\\"" + $multiAttr + "\\\" \\\"" + $multiFullAttr + "\\\"");
-            ;
-
-            button
-                -label "+"
-                -width 30
-                -command ("setAttr " + $fullAttrName + "." + $child
-                        + " (`getAttr " + $fullAttrName + "." + $child + "` + 1)");
-            button
-                -label "-"
-                -width 30
-                -command ("setAttr " + $fullAttrName + "." + $child
-                        + " (`getAttr " + $fullAttrName + "." + $child + "` - 1)");
-
-            setParent ..;
-
-            setUITemplate -pushTemplate attributeEditorTemplate;
-
-            houdiniAssetAdjustMulti($parent, $nodeName, $multiAttr, $multiFullAttr);
-
-            setParent ..;
-            setParent ..;
-        }
-        else
-        {
+        } else if($isMultiSize) {
+            createMultiParm($plug, $child, $multiparm_suffix, $fullAttr, $nodeName, $parmHelp);
+            
+        } else {
             buildAttrTree($nodeName, $child, $fullAttr + "." + $child);
         }
-
-        for ($category in $categories)
-        {
-            if ($category == "hapiParm_affectsOthers")
-            {
+        
+        for ($category in $categories) {
+            if ($category == "hapiParm_affectsOthers") {
                 // force a full attribute sync whenever this attribute changes
                 scriptJob -parent `setParent -q`
                           -attributeChange $plug
                           ("houdiniEngine_syncAssetAttributes " + $nodeName + ";");
             }
-            else if ($category == "hapiParm_syncsAsset")
-            {
+
+            if ($category == "hapiParm_syncsAsset") {
                 // force a full asset sync whenever this attribute changes
                 scriptJob -parent `setParent -q`
                           -attributeChange $plug
-                          ("houdiniEngine_syncAsset " + $nodeName + ";");
+                          ("houdiniEngine_syncAssetOutput " + $nodeName + ";");
             }
         }
     }
 }
 
-proc createAttrCheckBox(string $checkBox, string $label, string $annotation)
-{
+proc createAttrCheckBox(string $checkBox, string $label, string $annotation) {
     checkBox
         -label $label
         -annotation $annotation
         $checkBox;
 }
 
-proc replaceAttrCheckBox(string $checkBox, string $plug, string $changeCommand)
-{
+proc replaceAttrCheckBox(string $checkBox, string $plug, string $changeCommand) {
     checkBox -e
         -value `getAttr $plug`
         $checkBox;
@@ -508,13 +607,7 @@ proc replaceAttrCheckBox(string $checkBox, string $plug, string $changeCommand)
         $checkBox;
 }
 
-global proc houdiniAssetAdjustMulti(
-        string $parent,
-        string $nodeName,
-        string $attr,
-        string $fullAttr
-        )
-{
+global proc houdiniAssetAdjustMulti(string $parent, string $nodeName, string $attr, string $fullAttr) {
     setParent $parent;
 
     setUITemplate -pushTemplate attributeEditorTemplate;
@@ -524,149 +617,186 @@ global proc houdiniAssetAdjustMulti(
     int $curMultiSize = (`layout -q -numberOfChildren $parent` - 1);
     int $multiSize = `getAttr ($fullAttrName + "__multiSize")`;
 
-    if(`attributeQuery -node $nodeName -exists $attr`)
-    {
-        string $children[] = `attributeQuery -node $nodeName -listChildren $attr`;
-        //TODO: child attributes aren't created when the size is 0
-
-        for($i = $curMultiSize; $i < $multiSize; $i++)
-        {
+    if(attributeExists($attr, $nodeName)) {
+        for($i = $curMultiSize; $i < $multiSize; $i++) {
             // Wrap UI for each instance under one layout so that we have a known
             // number of children.
             columnLayout
+                -columnAttach "left" 22
                 -adjustableColumn true;
+                //-rowSpacing 2;
 
-            separator;
+                string $elementAttr = $fullAttr + "[" + $i + "]";
 
-            text
-                -align "left"
-                -label $i;
+                buildAttrTree($nodeName, $attr, $elementAttr);
 
-            string $elementAttr = $fullAttr + "[" + $i + "]";
-
-            buildAttrTree($nodeName, $attr, $elementAttr);
-
-            setParent ..;
+                setParent ..;
         }
+    } else if ($multiSize > 0) {
+        houdiniEngine_syncAssetAttributes($nodeName);
     }
 
     string $layoutChildArray[] = `layout -q -childArray $parent`;
-    for($i = $curMultiSize; $i-- > $multiSize;)
-    {
+    for($i = $curMultiSize; $i-- > $multiSize;) {
         deleteUI $layoutChildArray[$i + 1];
     }
 
     setUITemplate -popTemplate;
 }
 
-global proc
-AEhoudiniAssetOperationNew(string $attr)
-{
+global proc AEhoudiniAssetSyncCommandsNew(string $attr) {
     setUITemplate -pushTemplate NONE;
 
     columnLayout
         -adjustableColumn 1;
 
-        if(`houdiniEngine -license` == "Houdini-Indie"
-                || `houdiniEngine -license` == "Houdini-Engine-Indie")
-            text
-                -label "Houdini Engine Indie - For Limited Commercial Use Only"
-                -font "boldLabelFont"
-                -backgroundColor 1 1 0;
         rowLayout
             -numberOfColumns 3
+            -adjustableColumn 2
             -columnAttach 1 both 0
-            -columnAttach 2 both 0
+            -columnAttach 2 both 3
             -columnAttach 3 both 0
             -columnAlign 1 center
             -columnAlign 2 center
             -columnAlign 3 center
-            -columnWidth3 143 143 140;
+            -columnWidth3 148 148 148;
+        
+            iconTextButton -style "textOnly" -image "sync_asset_24.png"
+                -label "Sync Asset" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Recreate all the attributes and output nodes of this asset."
+                syncButton;
 
-        button -label "Bake Asset"
-            -h 27
-            -annotation "Sync this asset, then unparent and disconnect outputs"
-             bakeButton;
+            iconTextButton -style "textOnly" -image "sync_asset_24.png" 
+                -label "Sync Attributes" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Recreate only attributes of this asset."
+                syncAttribsButton;
 
-        button -label "Sync Asset"
-            -h 27
-            -annotation "Recreates all the parameters and output nodes."
-            syncButton;
-
-        button -label "Add Asset to History"
-            -h 27
-            -annotation "Connect this asset as history to the selected mesh"
-            historyButton;
-
-       setParent ..;
-    setParent ..;
+            iconTextButton -style "textOnly" -image "sync_asset_24.png"
+                -label "Sync Outputs" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Recreate only output nodes of this asset."
+                syncOutputsButton;
+        
+            setParent ..;
+        setParent ..;
 
     setUITemplate -popTemplate;
 
-    AEhoudiniAssetOperationReplace $attr;
+    AEhoudiniAssetSyncCommandsReplace $attr;
 }
 
-global proc
-AEhoudiniAssetOperationReplace(string $attr)
-{
+global proc AEhoudiniAssetSyncCommandsReplace(string $attr) {
     string $nodeName = plugNode($attr);
 
-    button -e
-        -c ("houdiniEngine_syncAsset " + $nodeName)
+    iconTextButton -e 
+        -command ("houdiniAsset -sync " + $nodeName)
         syncButton;
 
-    button -e
-        -c ("houdiniEngine_addHistory " + $nodeName)
-        historyButton;
+    iconTextButton -e 
+        -command ("houdiniAsset -sync " + $nodeName + " -syncAttributes")
+        syncAttribsButton;
 
-    button -e
-        -c ("houdiniEngine_bakeAsset " + $nodeName)
+    iconTextButton -e 
+        -command ("houdiniAsset -sync " + $nodeName + " -syncOutputs")
+        syncOutputsButton;
+}
+
+global proc AEhoudiniAssetReloadCommandsNew(string $attr) {
+    setUITemplate -pushTemplate NONE;
+
+    columnLayout
+        -adjustableColumn 1;
+
+        rowLayout
+            -numberOfColumns 3
+            -adjustableColumn 2
+            -columnAttach 1 both 0
+            -columnAttach 2 both 3
+            -columnAttach 3 both 0
+            -columnAlign 1 center
+            -columnAlign 2 center
+            -columnAlign 3 center
+            -columnWidth3 148 148 148;
+        
+            iconTextButton -style "textOnly" -image "reload_asset_24.png"
+                -label "Reload Asset" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Reload the asset definition for this asset.\nNote that other nodes using the same asset definition will not update until forced to cook (and then sync)."
+                reloadButton;
+
+            iconTextButton -style "textOnly" -image "sync_asset_24.png" 
+                -label "Reload without Syncing" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Reload the asset definition for the this asset, but do not sync the asset after reloading.\nIf you know that the asset has the same number and types of outputs as before, this avoids deleting and rebuilding the output shapes in Maya, and any downstream modifications to the outputs will be preserved."
+                reloadNoSyncButton;
+
+            iconTextButton -style "textOnly" -image "reload_asset_24.png"
+                -label "Bake Asset" 
+                -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
+                -annotation "Sync the selected asset, then tear off a copy of its output nodes."
+                bakeButton;
+        
+            setParent ..;
+        setParent ..;
+
+    setUITemplate -popTemplate;
+
+    AEhoudiniAssetReloadCommandsReplace $attr;
+}
+
+global proc AEhoudiniAssetReloadCommandsReplace(string $attr) {
+    string $nodeName = plugNode($attr);
+
+    iconTextButton -e 
+        -command ("houdiniAsset -reloadAsset " + $nodeName)
+        reloadButton;
+
+    iconTextButton -e 
+        -command ("houdiniAsset -reloadNoSync " + $nodeName)
+        reloadNoSyncButton;
+
+    iconTextButton -e 
+        -command ("houdiniEngine_bakeAsset " + $nodeName)
         bakeButton;
 }
 
-global proc AEhoudiniAssetSetInputToSelection(string $inputAttr)
-{
+global proc AEhoudiniAssetSetInputToSelection(string $inputAttr) {
     string $objects[] = `ls -selection -long`;
 
     // make sure we don't include the houdiniAsset node itself if it's selected last
-    if(size($objects))
-    {
+    if(size($objects)) {
         int $lastSelectionIndex = size($objects) - 1;
         string $node[];
         $node[0] = plugNode($inputAttr);
         $node = `ls -long $node[0]`;
-        if($node[0] == $objects[$lastSelectionIndex])
-        {
+        if($node[0] == $objects[$lastSelectionIndex]) {
             stringArrayRemoveAtIndex($lastSelectionIndex, $objects);
         }
     }
 
-    if(!houdiniEngine_setAssetInput($inputAttr, $objects))
-    {
+    if(!houdiniEngine_setAssetInput($inputAttr, $objects)) {
         error("Cannot set input.");
     }
 }
 
-global proc AEhoudiniAssetSetInputToText(string $textField, string $inputAttr)
-{
-    string $objects[] = stringToStringArray(`textField -q -text $textField`, " ");
+global proc AEhoudiniAssetSetInputToText(string $textField, string $inputAttr) {
+    string $objects[] = stringToStringArray(`textFieldGrp -q -text $textField`, " ");
 
-    if(!houdiniEngine_setAssetInput($inputAttr, $objects))
-    {
+    if(!houdiniEngine_setAssetInput($inputAttr, $objects)) {
         error("Cannot set input.");
     }
 }
 
-global proc AEhoudiniAssetInputsNew(string $inputsAttribute)
-{
+global proc AEhoudiniAssetInputsNew(string $inputsAttribute) {
     columnLayout -adj true "inputsLayout";
     setParent ..;
 
     AEhoudiniAssetInputsReplace $inputsAttribute;
 }
 
-global proc AEhoudiniAssetInputsReplace(string $inputsAttribute)
-{
+global proc AEhoudiniAssetInputsReplace(string $inputsAttribute) {
     string $parent = `setParent -q`;
     string $inputsLayoutFull = $parent + "|inputsLayout";
 
@@ -692,35 +822,34 @@ global proc AEhoudiniAssetInputsReplace(string $inputsAttribute)
 
         if($i < size($multiIndices) - 1)
         {
-            separator;
+            separator -height 12 -style "in";
         }
     }
 
     setParent ..;
 }
 
-global proc AEhoudiniAssetUpdateInput(string $inputLayout, string $inputAttribute)
-{
+global proc AEhoudiniAssetUpdateInput(string $inputLayout, string $inputAttribute) {
     string $inputTextField = $inputLayout + "|inputTextField";
 
-    string $inputGeometryNodes[] = houdiniEngine_getAssetInput(
-            $inputAttribute
-            );
+    string $inputGeometryNodes[] = houdiniEngine_getAssetInput($inputAttribute);
 
-    textField -edit -text (stringArrayToString($inputGeometryNodes, " "))
+    textFieldGrp -e 
+        -text (stringArrayToString($inputGeometryNodes, " "))
         $inputTextField;
 }
 
-global proc AEhoudiniAssetParmNew(string $houdiniAssetParmAttribute)
-{
-    columnLayout -adjustableColumn 1 "parmLayout";
+global proc AEhoudiniAssetParmNew(string $houdiniAssetParmAttribute) {
+    columnLayout -adjustableColumn 1 
+        //-rowSpacing 2
+        "parmLayout";
+
     setParent ..;
 
     AEhoudiniAssetParmReplace $houdiniAssetParmAttribute;
 }
 
-global proc AEhoudiniAssetParmReplace(string $houdiniAssetParmAttribute)
-{
+global proc AEhoudiniAssetParmReplace(string $houdiniAssetParmAttribute) {
     string $parent = `setParent -q`;
     string $parmLayoutFull = $parent + "|parmLayout";
 
@@ -737,14 +866,12 @@ global proc AEhoudiniAssetParmReplace(string $houdiniAssetParmAttribute)
     string $nodeName = plugNode($houdiniAssetParmAttribute);
     string $attrName = plugAttr($houdiniAssetParmAttribute);
 
-    if(`attributeQuery -node $nodeName -exists $attrName`)
-    {
+    if(attributeExists($attrName, $nodeName)) {
         buildAttrTree($nodeName, $attrName, $attrName);
     }
 }
 
-global proc AEhoudiniAssetShowCookMessages(string $nodeName)
-{
+global proc AEhoudiniAssetShowCookMessages(string $nodeName) {
     string $cookMessages = `houdiniAsset -cookMessages $nodeName`;
 
     string $window = "houdiniAssetShowCookMessages";
@@ -778,211 +905,121 @@ global proc AEhoudiniAssetShowCookMessages(string $nodeName)
     showWindow $window;
 }
 
-global proc AEhoudiniAssetOptionsNew(string $attr)
-{
-    global int $gAttributeEditorTemplateLabelWidth;
+global proc AEhoudiniAssetOptionsNew(string $attr) {
+    global int $gAttributeEditorTemplateLabelWidthCustom;
 
     columnLayout
         -adjustableColumn true
         optionsLayout;
 
-    columnLayout
-        -columnAttach "left" $gAttributeEditorTemplateLabelWidth
-        buttonLayout;
+        columnLayout
+            -columnAttach "left" $gAttributeEditorTemplateLabelWidthCustom 
+            //-rowSpacing 2
+            outputLayout;
+        
+            createAttrCheckBox("splitGeosByGroup", "Split Geos By Group",
+                    "Split geos by group.");
 
-        button -label "Show Cook Messages"
-            -annotation "Show the cook messages that were generated from the cook."
-            showCookMessagesButton;
+            createAttrCheckBox("outputGeometryGroups", "Output Geometry Groups",
+                    "Output geometry groups.");
 
-        button -label "Reset Simulation"
-            -annotation "Resets all the simulation caches."
-            resetSimulationButton;
+            separator -height 12 -style "in";
 
-        rowLayout
-            -numberOfColumns 2
-            -columnAttach 1 both 0
-            -columnAttach 2 both 0
-            -columnAlign 1 center
-            -columnAlign 2 center
-            -columnWidth2 130 130
-            reloadLayout;
+            createAttrCheckBox("outputMeshPreserveHardEdges", "Preserve mesh hard edges (possibly slow)",
+                    "Preserve hard edges when outputting mesh.");
 
-            button -label "Reload Asset"
-                -annotation "Reloads this asset to use the updated asset definition."
-                reloadAssetButton;
-            button -label "Reload Without Syncing"
-                -annotation "Reloads this asset keeping the existing parms and outputs"
-                reloadNoSyncButton;
+            createAttrCheckBox("outputMeshPreserveLockedNormals", "Preserve mesh locked normals (possibly slow)",
+                    "Preserve locked normals when outputting mesh.");
+            
+            separator -height 12 -style "in";
+
+            createAttrCheckBox("alwaysMergeInputGeometry", "Always Merge Input Geometry",
+                    "Always create a merge node when providing geometry to an input.");
+
+            createAttrCheckBox("packBeforeMerge", "Pack Input Geometry Before Merge",
+                    "Pack geometry before merging them together.");
+
+            separator -height 12 -style "in";
+
+            createAttrCheckBox("syncWhenInputConnects", "Sync When Input Connects",
+                    "Sync the output nodes when an input is connected.");
+
+            createAttrCheckBox("autoSyncOutputs", "Auto Sync Outputs",
+                    "Attemps to automatically sync the output nodes when necessary.");
+
+            separator -height 12 -style "in";
+
+            createAttrCheckBox("useAssetObjectTransform", "Use Asset Object Transform",
+                    "Use asset's object-level transform, if exists.");
+
+            createAttrCheckBox("outputHiddenObjects", "Output Hidden Objects",
+                    "Output hidden objects.");
+
+            createAttrCheckBox("outputTemplatedGeometries", "Output Templated Geometries",
+                    "Output templated geometries.");
+
+            createAttrCheckBox("outputCustomAttributes", "Output Custom Attributes",
+                    "Output custom attributes.");
+
+            createAttrCheckBox("ungroupOnBake", "Ungroup On Bake",
+                    "Ungroup baked items from mid-level transform.");
+
+            createAttrCheckBox("useInstancerNode", "Use Instancer Node",
+                    "Use particle instancer node to output instances.");
+
+            createAttrCheckBox("updateParmsForEvalMode", "Update Parms for Eval Mode",
+                    "When evaluation mode is Serial or Parallel, update animated parms.");
+
+            createAttrCheckBox("connectGeoForAssetInputs", "Connect Geo For Asset Inputs",
+                    "When setting an input to a geo output of another asset, connect through the geo, not directly from the asset.");
+
+            createAttrCheckBox("bakeOutputTextures", "Bake Output Textures",
+                    "When an Output Material has a Texture, bake to a file texture. Turn this off to improve performace when the texture is not needed.");
+
+            createAttrCheckBox("preserveScale", "Preserve Houdini Scale",
+                    "Interpret HDA Units as centimeters in Maya.");
+
+            separator -height 12 -style "in";
+
+            button 
+                -height 27
+                -label "Show Cook Messages"
+                -annotation "Show the cook messages that were generated from the cook."
+                showCookMessagesButton;
+
+            button
+                -height 27 
+                -label "Reset Simulation"
+                -annotation "Resets all the simulation caches."
+                resetSimulationButton;
+
+            setParent ..;
+
         setParent ..;
-
-    setParent ..;
-
-    separator;
-
-    columnLayout
-        -columnAttach "left" $gAttributeEditorTemplateLabelWidth
-        syncLayout;
-
-        createAttrCheckBox("syncWhenInputConnects", "Sync When Input Connects",
-                "Sync the output nodes when an input is connected.");
-
-        createAttrCheckBox("autoSyncOutputs", "Auto Sync Outputs",
-                "Attemps to automatically sync the output nodes when necessary.");
-
-        rowLayout
-            -numberOfColumns 2
-            -columnAttach 1 both 0
-            -columnAttach 2 both 0
-            -columnAlign 1 center
-            -columnAlign 2 center
-            -columnWidth2 130 130
-            syncButtonLayout;
-
-            button -label "Sync Asset"
-                -annotation "Recreates all the parameters and output nodes"
-                syncButton;
-            button -label "Sync Attributes"
-                -annotation "Recreates only the parameters"
-                syncAttrButton;
-        setParent ..;
-    setParent ..;
-
-    separator;
-
-    columnLayout
-        -columnAttach "left" $gAttributeEditorTemplateLabelWidth
-        outputLayout;
-
-        // Don't use attrControlGrp here, and manually create our own checkBox.
-        // For some reasons, Maya will trigger attrControlGrp's changeCommand
-        // at the end of a playback.
-        createAttrCheckBox(
-                "useAssetObjectTransform",
-                "Use Asset Object Transform",
-                "Use asset's object-level transform, if exists."
-                );
-
-        createAttrCheckBox("splitGeosByGroup", "Split Geos By Group",
-                "Split geos by group.");
-
-        createAttrCheckBox("outputHiddenObjects", "Output Hidden Objects",
-                "Output hidden objects.");
-
-        createAttrCheckBox(
-                "outputTemplatedGeometries",
-                "Output Templated Geometries",
-                "Output templated geometries."
-                );
-
-        createAttrCheckBox(
-                "outputGeometryGroups",
-                "Output Geometry Groups",
-                "Output geometry groups."
-                );
-
-        createAttrCheckBox(
-                "outputCustomAttributes",
-                "Output Custom Attributes",
-                "Output custom attributes."
-                );
-
-        createAttrCheckBox(
-                "outputMeshPreserveHardEdges",
-                "Preserve mesh hard edges (possibly slow)",
-                "Preserve hard edges when outputting mesh"
-                );
-
-        createAttrCheckBox(
-                "outputMeshPreserveLockedNormals",
-                "Preserve mesh locked normals (possibly slow)",
-                "Preserve locked normals when outputting mesh"
-                );
-
-        createAttrCheckBox(
-                "ungroupOnBake",
-                "Ungroup On Bake",
-                "Ungroup baked items from mid-level transform"
-                );
-
-        createAttrCheckBox("useInstancerNode", "Use Instancer Node",
-                "Use particle instancer node to output instances.");
-
-        createAttrCheckBox(
-                "updateParmsForEvalMode",
-                "Update Parms for Eval Mode",
-                "When evaluation mode is Serial or Parallel, update animated parms "
-                );
-        createAttrCheckBox(
-                "connectGeoForAssetInputs",
-                "Connect Geo For Asset Inputs",
-                "When setting an input to a geo output of another asset, connect through the geo, not directly from the asset"
-                );
-        createAttrCheckBox(
-                "bakeOutputTextures",
-                "Bake Output Textures",
-                "When an Output Material has a Texture, bake to a file texture. Turn this off to improve performace when the texture is not needed."
-                );
-        createAttrCheckBox(
-                "preserveScale",
-                "Preserve Houdini Scale",
-                "Interpret HDA Units as centimeters in Maya."
-                );
-
-        createAttrCheckBox(
-                "alwaysMergeInputGeometry",
-                "Always Merge Input Geometry",
-                "Always create a merge node when providing geometry to an input."
-                );
-
-        createAttrCheckBox(
-                "packBeforeMerge",
-                "Pack Geo Before Merge",
-                "Pack geometry before merging them together."
-                );
-
-    setParent ..;
-
-    setParent ..;
 
     AEhoudiniAssetOptionsReplace $attr;
 }
 
-global proc AEhoudiniAssetOptionsReplace(string $attr)
-{
+global proc AEhoudiniAssetOptionsReplace(string $attr) {
     string $nodeName = plugNode($attr);
 
     string $parent = `setParent -q`;
     string $optionsLayoutFull = $parent + "|optionsLayout";
-
-    // buttonLayout
+    
+    // outputLayout
     button -e
         -c ("AEhoudiniAssetShowCookMessages " + $nodeName)
-        ($optionsLayoutFull + "|buttonLayout|showCookMessagesButton");
+        ($optionsLayoutFull + "|outputLayout|showCookMessagesButton");
     button -e
         -c ("houdiniAsset -resetSimulation " + $nodeName)
-        ($optionsLayoutFull + "|buttonLayout|resetSimulationButton");
-    button -e
-        -c ("houdiniAsset -reloadAsset " + $nodeName)
-        ($optionsLayoutFull + "|buttonLayout|reloadLayout|reloadAssetButton");
-    button -e
-        -c ("houdiniAsset -reloadNoSync " + $nodeName)
-        ($optionsLayoutFull + "|buttonLayout|reloadLayout|reloadNoSyncButton");
+        ($optionsLayoutFull + "|outputLayout|resetSimulationButton");
 
-    // syncLayout
-    replaceAttrCheckBox($optionsLayoutFull + "|syncLayout|syncWhenInputConnects",
+    replaceAttrCheckBox($optionsLayoutFull + "|outputLayout|syncWhenInputConnects",
             $nodeName + ".syncWhenInputConnects",
             "");
-    replaceAttrCheckBox($optionsLayoutFull + "|syncLayout|autoSyncOutputs",
+    replaceAttrCheckBox($optionsLayoutFull + "|outputLayout|autoSyncOutputs",
             $nodeName + ".autoSyncOutputs",
             "houdiniEngine_syncAssetOutput \"" + $nodeName + "\";");
-    button -e
-        -c ("houdiniEngine_syncAsset " + $nodeName)
-        ($optionsLayoutFull + "|syncLayout|syncButtonLayout|syncButton");
-    button -e
-        -c ("houdiniEngine_syncAssetAttributes " + $nodeName)
-        ($optionsLayoutFull + "|syncLayout|syncButtonLayout|syncAttrButton");
-
-    // outputLayout
     replaceAttrCheckBox(
             $optionsLayoutFull + "|outputLayout|useAssetObjectTransform",
             $nodeName + ".useAssetObjectTransform",
@@ -1043,8 +1080,7 @@ global proc AEhoudiniAssetOptionsReplace(string $attr)
             "houdiniEngine_packBeforeMergeChanged \"" + $nodeName + "\";");
 }
 
-global proc AEhoudiniAssetConnectNew( string $attrName )
-{
+global proc AEhoudiniAssetConnectNew( string $attrName ) {
     setUITemplate -pst attributeEditorTemplate;
     attrEnumOptionMenuGrp -attribute $attrName
         -enumeratedItem 0 "Classic Asset"
@@ -1056,13 +1092,13 @@ global proc AEhoudiniAssetConnectNew( string $attrName )
     AEhoudiniAssetConnectReplace $attrName;
 }
 
-global proc AEhoudiniAssetConnectReplace( string $attrName )
-{
-    attrEnumOptionMenuGrp -e -attribute $attrName AEhoudiniAssetConnectEnum;
+global proc AEhoudiniAssetConnectReplace( string $attrName ) {
+    attrEnumOptionMenuGrp -e 
+        -attribute $attrName 
+        AEhoudiniAssetConnectEnum;
 }
 
-proc handleAssetHelpSection( string $nodeName )
-{
+proc handleAssetHelpSection( string $nodeName ) {
     string $plugNode = `plugNode($nodeName)`;
     int $hasHelpURL  = size(`getAttr($plugNode + ".assetHelpURL")`) > 0;
     int $hasHelpText = size(`getAttr($plugNode + ".assetHelpText")`) > 0;
@@ -1079,8 +1115,7 @@ proc handleAssetHelpSection( string $nodeName )
         scrollField -e -text `getAttr($plugNode + ".assetHelpText")` AEhoudiniAssetHelpTextField;
 }
 
-global proc AEhoudiniAssetHelpNew( string $nodeName )
-{
+global proc AEhoudiniAssetHelpNew( string $nodeName ) {
     button      -label "Open Help" AEhoudiniAssetHelpURLBtn;
     scrollField -editable false AEhoudiniAssetHelpTextField;
     text        -align "center" -label "No Help Found" AEhoudiniAssetHelpEmptyLabel;
@@ -1088,105 +1123,123 @@ global proc AEhoudiniAssetHelpNew( string $nodeName )
     handleAssetHelpSection($nodeName);
 }
 
-global proc AEhoudiniAssetHelpReplace( string $nodeName )
-{
+global proc AEhoudiniAssetHelpReplace( string $nodeName ) {
     handleAssetHelpSection($nodeName);
 }
 
-global proc AEhoudiniAssetTemplate(string $nodeName)
-{
-    editorTemplate -beginScrollLayout;
+proc handleAssetPathSection( string $nodeName ) {
+    string $directory = `python "import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir"`;
 
-    editorTemplate -callCustom "AEhoudiniAssetOperationNew" "AEhoudiniAssetOperationReplace"
-        "unused";
+    string $plugNode = `plugNode($nodeName)`;
+    string $filePath = `getAttr ($plugNode + ".otlFilePath")`;
 
-    // special ui for inputs
-    string $inputAttrArray[] = `listAttr -st "input" $nodeName`;
-    string $inputAttr = $inputAttrArray[0];
-    if($inputAttr != "")
-    {
-        editorTemplate -beginLayout "Inputs" -collapse false;
+    string $filePathAbsolute = `substitute "%PRISM_PROJECT_PATH%" $filePath $directory`;
 
-            editorTemplate -callCustom "AEhoudiniAssetInputsNew" "AEhoudiniAssetInputsReplace"
-                $inputAttr;
-
-        editorTemplate -endLayout;
-    }
-
-    editorTemplate -beginLayout ("Help for " + $nodeName) -collapse false;
-        editorTemplate -callCustom "AEhoudiniAssetHelpNew"  "AEhoudiniAssetHelpReplace" $nodeName;
-    editorTemplate -endLayout;
-
-    editorTemplate -callCustom "AEhoudiniAssetParmNew" "AEhoudiniAssetParmReplace" "houdiniAssetParm";
-
-    editorTemplate -beginLayout "Asset Information" -collapse false;
-
-        editorTemplate
-            -label "Asset Type"
-            -addControl "assetName";
-        editorTemplate
-            -label "File Path"
-            -addControl "otlFilePath";
-
-        editorTemplate -beginLayout "Asset State" -collapse true;
-            editorTemplate -callCustom "AEhoudiniAssetConnectNew" "AEhoudiniAssetConnectReplace" "assetConnectType";
-            editorTemplate
-                -label "Frozen"
-                -addControl "frozen";
-        editorTemplate -endLayout;
-
-    editorTemplate -endLayout;
-
-    editorTemplate -beginLayout "Asset Options" -collapse false;
-
-        editorTemplate -callCustom "AEhoudiniAssetOptionsNew" "AEhoudiniAssetOptionsReplace" "unused";
-        editorTemplate -beginLayout "Asset Callbacks" -collapse true;
-            editorTemplate
-                -label "Pre Sync Callback"
-                -addControl "preSyncCallback";
-
-            editorTemplate
-                -label "Post Sync Callback"
-                -addControl "postSyncCallback";
-
-        editorTemplate -endLayout;
-
-        editorTemplate -suppress "syncWhenInputConnects";
-        editorTemplate -suppress "autoSyncOutputs";
-
-        editorTemplate -suppress "useAssetObjectTransform";
-        editorTemplate -suppress "splitGeosByGroup";
-        editorTemplate -suppress "outputHiddenObjects";
-        editorTemplate -suppress "outputTemplatedGeometries";
-        editorTemplate -suppress "outputGeometryGroups";
-        editorTemplate -suppress "outputCustomAttributes";
-        editorTemplate -suppress "outputMeshPreserveHardEdges";
-        editorTemplate -suppress "outputMeshPreserveLockedNormals";
-        editorTemplate -suppress "output";
-        editorTemplate -suppress "ungroupOnBake";
-        editorTemplate -suppress "updateParmsForEvalMode";
-        editorTemplate -suppress "bakeOutputTextures";
-        editorTemplate -suppress "preserveScale";
-        editorTemplate -suppress "connectGeoForAssetInputs";
-        editorTemplate -suppress "alwaysMergeInputGeometry";
-        editorTemplate -suppress "packBeforeMerge";
-
-        editorTemplate -suppress "useInstancerNode";
-        editorTemplate -suppress "cachedSrcAttr";
-        editorTemplate -suppress "cachedDstAttr";
-        editorTemplate -suppress "cachedDstNode";
-
-    editorTemplate -endLayout;
-
-    editorTemplate -beginLayout "Maya Transform Attributes";
-
-        AEtransformMain $nodeName;
-        AEtransformNoScroll $nodeName;
-
-    editorTemplate -endLayout;
-
-    editorTemplate -addExtraControls;
-
-    editorTemplate -endLayout;
+    textFieldGrp -e -text $filePathAbsolute AEhoudiniAssetPathText;
 }
 
+global proc AEhoudiniAssetPathNew( string $nodeName ) {
+    textFieldGrp
+        -label "File Path"
+        -text "" 
+        AEhoudiniAssetPathText;
+
+    handleAssetPathSection($nodeName);
+}
+
+global proc AEhoudiniAssetPathReplace( string $nodeName ) {
+    handleAssetPathSection($nodeName);
+}
+
+global proc AEhoudiniAssetTemplate(string $nodeName) {
+    editorTemplate -beginLayout "Houdini Engine Commands";
+        editorTemplate -beginLayout "Sync Commands" -collapse false;
+            editorTemplate -callCustom "AEhoudiniAssetSyncCommandsNew" "AEhoudiniAssetSyncCommandsReplace"
+        "unused";
+        editorTemplate -endLayout;
+
+        editorTemplate -beginLayout "Reload and Bake Commands";
+            editorTemplate -callCustom "AEhoudiniAssetReloadCommandsNew" "AEhoudiniAssetReloadCommandsReplace"
+        "unused";
+        editorTemplate -endLayout;
+    editorTemplate -endLayout;
+
+    editorTemplate -beginScrollLayout;
+    
+        editorTemplate -beginLayout "Asset Parameters" -collapse false;
+            editorTemplate -callCustom "AEhoudiniAssetParmNew" "AEhoudiniAssetParmReplace" "houdiniAssetParm";
+        editorTemplate -endLayout;
+
+        editorTemplate -beginLayout "Asset Help" -collapse true;
+            editorTemplate -callCustom "AEhoudiniAssetHelpNew" "AEhoudiniAssetHelpReplace" $nodeName;
+        editorTemplate -endLayout;
+
+        editorTemplate -beginLayout "Asset Information";
+
+            editorTemplate
+                -label "Asset Type"
+                -addControl "assetName";
+            editorTemplate -callCustom "AEhoudiniAssetPathNew" "AEhoudiniAssetPathReplace" $nodeName;
+                //-label "File Path"
+                //-addControl "otlFilePath";
+
+            editorTemplate -beginLayout "Asset State" -collapse true;
+                editorTemplate -callCustom "AEhoudiniAssetConnectNew" "AEhoudiniAssetConnectReplace" "assetConnectType";
+                editorTemplate
+                    -label "Frozen"
+                    -addControl "frozen";
+            editorTemplate -endLayout;
+
+        editorTemplate -endLayout;
+
+        editorTemplate -beginLayout "Asset Options" -collapse true;
+
+            editorTemplate -callCustom "AEhoudiniAssetOptionsNew" "AEhoudiniAssetOptionsReplace" "unused";
+            editorTemplate -beginLayout "Asset Callbacks" -collapse true;
+                editorTemplate
+                    -label "Pre Sync Callback"
+                    -addControl "preSyncCallback";
+
+                editorTemplate
+                    -label "Post Sync Callback"
+                    -addControl "postSyncCallback";
+
+            editorTemplate -endLayout;
+
+            editorTemplate -suppress "syncWhenInputConnects";
+            editorTemplate -suppress "autoSyncOutputs";
+
+            editorTemplate -suppress "useAssetObjectTransform";
+            editorTemplate -suppress "splitGeosByGroup";
+            editorTemplate -suppress "outputHiddenObjects";
+            editorTemplate -suppress "outputTemplatedGeometries";
+            editorTemplate -suppress "outputGeometryGroups";
+            editorTemplate -suppress "outputCustomAttributes";
+            editorTemplate -suppress "outputMeshPreserveHardEdges";
+            editorTemplate -suppress "outputMeshPreserveLockedNormals";
+            editorTemplate -suppress "output";
+            editorTemplate -suppress "ungroupOnBake";
+            editorTemplate -suppress "updateParmsForEvalMode";
+            editorTemplate -suppress "bakeOutputTextures";
+            editorTemplate -suppress "preserveScale";
+            editorTemplate -suppress "connectGeoForAssetInputs";
+            editorTemplate -suppress "alwaysMergeInputGeometry";
+            editorTemplate -suppress "packBeforeMerge";
+
+            editorTemplate -suppress "useInstancerNode";
+            editorTemplate -suppress "cachedSrcAttr";
+            editorTemplate -suppress "cachedDstAttr";
+            editorTemplate -suppress "cachedDstNode";
+
+        editorTemplate -endLayout;
+
+        editorTemplate -beginLayout "Maya Transform Attributes";
+
+            AEtransformMain $nodeName;
+            AEtransformNoScroll $nodeName;
+
+        editorTemplate -endLayout;
+
+        editorTemplate -addExtraControls;
+    editorTemplate -endLayout;
+}
