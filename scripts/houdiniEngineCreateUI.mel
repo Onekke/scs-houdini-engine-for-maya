@@ -474,25 +474,25 @@ houdiniEngine_updateToolsShelf()
     }
 } */
 
-global proc houdiniEngine_updatePackageShelf(string $packageName, string $packageDir) {
+global proc houdiniEngine_updatePackageShelf(string $packageDir) {
     // Note - don't put this command on the Tools shelf itself - it will crash
-    if(`shelfLayout -exists ("Houdini" + $packageName)`)
-        deleteShelfTab ("Houdini" + $packageName);
+    if(`shelfLayout -exists ("HoudiniTools")`)
+        deleteShelfTab ("HoudiniTools");
 
     string $PRISM_PROJECT_PATH = `python "import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir"`;
 
     $packagePath = ($PRISM_PROJECT_PATH + "art_assets/houdini/packages/" + $packageDir);
-    if(!`shelfLayout -exists ("Houdini" + $packageName)`)
-        catchQuiet(houdiniEngine_buildPackageShelf ($packageName, $packagePath));
+    if(!`shelfLayout -exists "HoudiniTools"`)
+        catchQuiet(houdiniEngine_buildPackageShelf ($packagePath));
 }
 
-global proc houdiniEngine_buildPackageShelf(string $packageName, string $packagePath) {
+global proc houdiniEngine_buildPackageShelf(string $packagePath) {
     global string $gShelfTopLevel;
 
     // load an empty shelf to make sure that the deleted shelf is really gone
     // just using addNewShelfTab with the same name would restore deleted items !!!
     string $MODULE_PATH = `getModulePath -moduleName "houdiniEngine"`;
-    loadNewShelf ($MODULE_PATH + "/scripts/shelf_Houdini" + $packageName);
+    loadNewShelf ($MODULE_PATH + "/scripts/shelf_HoudiniTools");
 
     string $currentShelf = `tabLayout -query -selectTab $gShelfTopLevel`;
     setParent $currentShelf;
@@ -501,11 +501,15 @@ global proc houdiniEngine_buildPackageShelf(string $packageName, string $package
     //string $icons[] = `getFileList -folder ($packagePath + "/icons/") - filespec "*.png"`;
 
     for($hda in $hdas) {
-        string $name = basename($hda, ".hda");
-        string $buffer[];
-        $numTokens = `tokenize $name "." $buffer`;
-        string $icon = $packagePath + "/icons/" + $buffer[0] + ".png";
-        print($icon + "\n");
+        string $assetFullName = basenameEx($hda);
+        string $buffer[]; // [type_author][branch][snake_case_name][major_version][minor_version]
+        $numTokens = `tokenize $assetFullName "." $buffer`;
+
+        if (`strcmp $buffer[1] "maya"` != 0) continue;
+
+        string $icon = $packagePath + "/icons/" + $buffer[2] + ".png";
+        string $label = $buffer[2];
+        
         string $path = ($packagePath + "/hda/" + $hda);
         string $assets[] = `houdiniAsset -listAssets $path`;
         
@@ -516,7 +520,7 @@ global proc houdiniEngine_buildPackageShelf(string $packageName, string $package
         shelfButton
             -command $script
             -sourceType "mel"
-            -label $name
+            -label $label
             -image $icon
             -style "iconOnly"
             -width 32
@@ -823,19 +827,13 @@ houdiniEngineCreateUI()
             -label "Architecture"
             -imageOverlayLabel "UHArcS"
             -annotation "Rebuild your Houdini Artist shelf with architecture tools from the contents of the scs_prod_architecture directory."
-            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_prod_architecture\"";
-
-        menuItem 
-            -label "Dev Architecture"
-            -imageOverlayLabel "UHDevArcS"
-            -annotation "Rebuild your Houdini Artist shelf with architecture tools from the contents of the scs_dev_architecture directory."
-            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_dev_architecture\"";
+            -command "houdiniEngine_updatePackageShelf \"scs_architecture\"";
 
         menuItem 
             -label "Shared"
             -imageOverlayLabel "UHDevArcS"
             -annotation "Rebuild your Houdini Artist shelf with shared tools from the contents of the scs_dev_shared directory."
-            -command "houdiniEngine_updatePackageShelf \"Tools\" \"scs_dev_shared\"";
+            -command "houdiniEngine_updatePackageShelf \"scs_shared\"";
         
         setParent -menu ..;
     /*
