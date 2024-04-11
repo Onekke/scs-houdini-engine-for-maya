@@ -508,7 +508,7 @@ global proc houdiniEngine_buildPackageShelf(string $packagePath) {
         if (`strcmp $buffer[1] "maya"` != 0) continue;
 
         string $icon = $packagePath + "/icons/" + $buffer[2] + ".png";
-        string $label = $buffer[2];
+        string $label = $buffer[2] + "." + $buffer[3] + "." + $buffer[4];
         
         string $path = ($packagePath + "/hda/" + $hda);
         string $assets[] = `houdiniAsset -listAssets $path`;
