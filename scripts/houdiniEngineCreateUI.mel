@@ -500,15 +500,20 @@ global proc houdiniEngine_buildPackageShelf(string $packagePath) {
     string $hdas[] = `getFileList -folder ($packagePath + "/hda/") - filespec "*.hda"`;
     //string $icons[] = `getFileList -folder ($packagePath + "/icons/") - filespec "*.png"`;
 
-    for($hda in $hdas) {
+    for ($hda in $hdas) {
         string $assetFullName = basenameEx($hda);
         string $buffer[]; // [type_author][branch][snake_case_name][major_version][minor_version]
         $numTokens = `tokenize $assetFullName "." $buffer`;
 
         if (`strcmp $buffer[1] "maya"` != 0) continue;
 
+        //string $hdasStringArray = stringArrayToString($hdas, ",");
+        //string $hdasSubstring = $buffer[0] + "." + $buffer[1] + "." + $buffer[2];
+        //string $assetVersions = `python("from houdiniEngineCreateUIHelpers import find_all_versions; find_all_versions(\'" + $hdasStringArray + "\', \'" + $hdasSubstring + "\')")`;
+        //print($assetVersions + "\n");
+
         string $icon = $packagePath + "/icons/" + $buffer[2] + ".png";
-        string $label = $buffer[2];
+        string $label = $buffer[2] + "." + $buffer[3] + "." + $buffer[4];
         
         string $path = ($packagePath + "/hda/" + $hda);
         string $assets[] = `houdiniAsset -listAssets $path`;
@@ -525,6 +530,8 @@ global proc houdiniEngine_buildPackageShelf(string $packagePath) {
             -style "iconOnly"
             -width 32
             -height 32;
+            //-menuItem $label $script
+            //-menuItem $label $script;
     }
 }
 
