@@ -48,6 +48,25 @@ houdiniEngine_browseAssetLibrary() {
     houdiniEngine_loadAssetLibrary($assetLibraryFilePath);
 }
 
+global proc houdiniEngine_browseAssetLibraryPackage(string $packageName) {
+    string $directory = `python("import os; pathdir = os.path.expandvars(\"%PRISM_PROJECT_PATH%\"); pathdir = os.path.join(pathdir, \"art_assets\", \"houdini\", \"packages\", \"" + $packageName + "\", \"hda\"); pathdir")`;
+    string $filter = "Houdini Asset Library (*.otl *.hda *.otllc *.hdalc *.otlnc *.hdanc);;All Files (*.*)";
+    string $results[] = `fileDialog2
+        -caption "Browse Asset Library"
+        -okCaption "Open"
+        -fileFilter $filter
+        -fileMode 1
+        -startingDirectory $directory`;
+    if(size($results) == 0)
+    {
+        return;
+    }
+
+    string $assetLibraryFilePath = $results[0];
+
+    houdiniEngine_loadAssetLibrary($assetLibraryFilePath);
+}
+
 global proc
 houdiniEngine_loadAssetLibrary(string $assetLibraryFilePath)
 {
@@ -796,7 +815,18 @@ houdiniEngineCreateUI()
         -image "load_asset_24.png"
         -imageOverlayLabel "LA"
         -annotation "Browse for assets or asset libraries."
-        -command "houdiniEngine_browseAssetLibrary";
+        -subMenu true 
+        -tearOff true;
+
+        menuItem
+            -label "from SCS Architecture package"
+            -command "houdiniEngine_browseAssetLibraryPackage \"scs_architecture\"";
+
+        menuItem
+            -label "from SCS Shared package"
+            -command "houdiniEngine_browseAssetLibraryPackage \"scs_shared\"";
+        
+        setParent -menu ..;
 
     $recentAssetsMenu = `menuItem
         -label "Recent Assets"
