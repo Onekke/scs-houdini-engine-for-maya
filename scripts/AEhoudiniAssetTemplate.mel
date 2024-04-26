@@ -661,19 +661,19 @@ global proc AEhoudiniAssetSyncCommandsNew(string $attr) {
             -columnAlign 3 center
             -columnWidth3 148 148 148;
         
-            iconTextButton -style "textOnly" -image "sync_asset_24.png"
+            iconTextButton -style "textOnly" //-image "sync_asset_24.png"
                 -label "Sync Asset" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Recreate all the attributes and output nodes of this asset."
                 syncButton;
 
-            iconTextButton -style "textOnly" -image "sync_asset_24.png" 
+            iconTextButton -style "textOnly" //-image "sync_asset_24.png" 
                 -label "Sync Attributes" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Recreate only attributes of this asset."
                 syncAttribsButton;
 
-            iconTextButton -style "textOnly" -image "sync_asset_24.png"
+            iconTextButton -style "textOnly" //-image "sync_asset_24.png"
                 -label "Sync Outputs" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Recreate only output nodes of this asset."
@@ -720,19 +720,19 @@ global proc AEhoudiniAssetReloadCommandsNew(string $attr) {
             -columnAlign 3 center
             -columnWidth3 148 148 148;
         
-            iconTextButton -style "textOnly" -image "reload_asset_24.png"
+            iconTextButton -style "textOnly" //-image "reload_asset_24.png"
                 -label "Reload Asset" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Reload the asset definition for this asset.\nNote that other nodes using the same asset definition will not update until forced to cook (and then sync)."
                 reloadButton;
 
-            iconTextButton -style "textOnly" -image "sync_asset_24.png" 
+            iconTextButton -style "textOnly" //-image "sync_asset_24.png" 
                 -label "Reload without Syncing" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Reload the asset definition for the this asset, but do not sync the asset after reloading.\nIf you know that the asset has the same number and types of outputs as before, this avoids deleting and rebuilding the output shapes in Maya, and any downstream modifications to the outputs will be preserved."
                 reloadNoSyncButton;
 
-            iconTextButton -style "textOnly" -image "reload_asset_24.png"
+            iconTextButton -style "textOnly" //-image "reload_asset_24.png"
                 -label "Bake Asset" 
                 -h 27 -backgroundColor 0.36 0.36 0.36 -mw 3
                 -annotation "Sync the selected asset, then tear off a copy of its output nodes."
