@@ -517,7 +517,7 @@ global proc houdiniEngine_buildPackageShelf(string $packagePath) {
     setParent $currentShelf;
 
     string $hdas[] = `getFileList -folder ($packagePath + "/hda/") - filespec "*.hda"`;
-    //string $icons[] = `getFileList -folder ($packagePath + "/icons/") - filespec "*.png"`;
+    //string $icons[] = `getFileList -folder ($packagePath + "/help/icons/") - filespec "*.png"`;
 
     for($hda in $hdas) {
         string $assetFullName = basenameEx($hda);
@@ -526,7 +526,7 @@ global proc houdiniEngine_buildPackageShelf(string $packagePath) {
 
         if (`strcmp $buffer[1] "maya"` != 0) continue;
 
-        string $icon = $packagePath + "/icons/" + $buffer[2] + ".png";
+        string $icon = $packagePath + "/help/icons/" + $buffer[2] + ".png";
         string $label = $buffer[2] + "." + $buffer[3] + "." + $buffer[4];
         
         string $path = ($packagePath + "/hda/" + $hda);
