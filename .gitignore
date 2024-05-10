@@ -1,2 +1,4 @@
 Makefile
 build-maya*
+icons/Thumbs.db
+.vscode/settings.json

@@ -511,7 +511,7 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                 }
  
             } else if ($type == "float3") {
-                colorSliderGrp
+                attrColorSliderGrp
                     -label $niceName
                     -annotation $parmHelp
                     -enable $isEnabled;
