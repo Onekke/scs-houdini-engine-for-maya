@@ -509,13 +509,6 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                 } else {
                     createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName);
                 }
- 
-            } else if ($type == "float3") {
-                attrColorSliderGrp
-                    -label $niceName
-                    -annotation $parmHelp
-                    -enable $isEnabled;
-
             } else {
                 attrControlGrp 
                     -attribute $plug
