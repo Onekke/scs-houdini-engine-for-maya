@@ -15,6 +15,7 @@
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 
+#include "HoudiniApi.h"
 #include "hapiutil.h"
 #include "types.h"
 #include "util.h"

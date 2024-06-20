@@ -20,7 +20,7 @@
 #include "OutputGeometryObject.h"
 #include "OutputInstancerObject.h"
 #include "OutputMaterial.h"
-#include "util.h"
+
 
 #include <algorithm>
 #include <cassert>

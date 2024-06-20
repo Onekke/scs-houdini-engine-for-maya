@@ -7,6 +7,7 @@
 #include "InputCurveNode.h"
 #include "MayaTypeID.h"
 #include "hapiutil.h"
+#include "HoudiniApi.h"
 #include "util.h"
 
 #include <cassert>

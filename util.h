@@ -107,6 +107,9 @@
 
 namespace Util
 {
+    bool getHarsPath(std::string& harsPath);
+    bool checkBuildEngineCompatibility();
+    static bool isHapilLoaded;
 class HAPISession : public HAPI_Session
 {
 public:

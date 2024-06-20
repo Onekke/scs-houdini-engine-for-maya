@@ -3,6 +3,7 @@
 #include <maya/MFnMatrixAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 
+#include "HoudiniApi.h"
 #include "MayaTypeID.h"
 #include "hapiutil.h"
 #include "util.h"

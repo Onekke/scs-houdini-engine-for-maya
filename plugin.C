@@ -19,11 +19,14 @@
 #include "InputMergeNode.h"
 #include "InputTransformNode.h"
 #include "OptionVars.h"
+#include "HoudiniApi.h"
 #include "Platform.h"
 #include "util.h"
 
 #include <cstdlib>
 #include <fstream>
+#include "HoudiniApi.h"
+#include <HAPI/HAPI_Version.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else

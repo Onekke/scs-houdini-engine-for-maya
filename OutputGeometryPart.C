@@ -31,6 +31,7 @@
 #include "hapiutil.h"
 #include "types.h"
 #include "util.h"
+#include "HoudiniApi.h"
 
 OutputGeometryPart::OutputGeometryPart(HAPI_NodeId nodeId, HAPI_PartId partId)
     : myNodeId(nodeId),

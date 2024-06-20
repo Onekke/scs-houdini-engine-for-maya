@@ -5,6 +5,8 @@
 #include <maya/MSelectionList.h>
 
 #include <maya/MFnDagNode.h>
+#include "HoudiniApi.h"
+#include "HAPI/HAPI_Version.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -17,7 +19,7 @@
 namespace Util
 {
 std::unique_ptr<HAPISession> theHAPISession;
-bool isHapilLoaded;
+
 
 bool
 #ifdef _WIN32

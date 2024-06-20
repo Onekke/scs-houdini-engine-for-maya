@@ -125,8 +125,11 @@ elseif ( ${CMAKE_SYSTEM_NAME} STREQUAL "Windows" )
         /O2
         /DEBUG
         /Zi
-        /DYNAMICBASE:NO
         /EHsc	
+        )
+    set(
+        linker_options
+        /DYNAMICBASE:NO
         )
 elseif ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
     set(

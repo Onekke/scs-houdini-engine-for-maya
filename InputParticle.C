@@ -12,6 +12,7 @@
 
 #include "hapiutil.h"
 #include "util.h"
+#include "HoudiniApi.h"
 
 InputParticle::InputParticle() : Input()
 {

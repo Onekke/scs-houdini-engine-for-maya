@@ -8,6 +8,7 @@
 #include "MayaTypeID.h"
 #include "hapiutil.h"
 #include "util.h"
+#include "HoudiniApi.h"
 
 MString InputTransformNode::typeName("houdiniInputTransform");
 MTypeId InputTransformNode::typeId(MayaTypeID_HoudiniInputTransformNode);

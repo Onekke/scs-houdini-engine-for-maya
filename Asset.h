@@ -11,6 +11,7 @@
 
 #include "AssetNodeOptions.h"
 #include "OutputObject.h"
+#include "util.h"
 
 #include <memory>
 #include <vector>
