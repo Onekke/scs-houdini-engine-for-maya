@@ -108,4 +108,3 @@ set(MAYA_PLUGIN_ICONS
     ${MAYA_ICON_DIRECTORY}/he_surface_instancer.png
     ${MAYA_ICON_DIRECTORY}/houdiniAsset.png
 )
-

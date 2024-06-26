@@ -4,13 +4,15 @@ set(BUILD_SHARED_LIBS OFF)
 
 project( Maya )
 
-set( MAYA_VERSION 2014 CACHE STRING "" )
+set( MAYA_VERSION 2022 CACHE STRING "" )
 
 set( MAYA_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 set( MAYA_SCRIPT_DIRECTORY "${MAYA_SOURCE_DIRECTORY}/scripts")
 set( MAYA_ICON_DIRECTORY   "${MAYA_SOURCE_DIRECTORY}/icons")
 
+
 include( ./cmake/PluginFiles.cmake )
+
 
 ########################################
 # Module structure
@@ -56,6 +58,24 @@ file(
 # plugin
 ########################################
 add_library( plugin SHARED ${MAYA_PLUGIN_SOURCES} )
+
+set_target_properties( plugin PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "../plug-ins"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "../plug-ins"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "../plug-ins"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "../plug-ins"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "../plug-ins"
+    ARCHIVE_OUTPUT_DIRECTORY "../plug-ins"
+    ARCHIVE_OUTPUT_DIRECTORY_DEBUG "../plug-ins"
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE "../plug-ins"
+    ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "../plug-ins"
+    ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "../plug-ins"
+    LIBRARY_OUTPUT_DIRECTORY "../plug-ins"
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG "../plug-ins"
+    LIBRARY_OUTPUT_DIRECTORY_RELEASE "../plug-ins"
+    LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "../plug-ins"
+    LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "../plug-ins"
+)
 
 if ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
     set( plugin_suffix ".so" )
