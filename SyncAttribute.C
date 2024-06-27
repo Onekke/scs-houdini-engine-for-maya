@@ -15,38 +15,65 @@
 #include "AssetNode.h"
 #include "util.h"
 
+
+static void getParmTags(const HAPI_NodeInfo& myNodeInfo, const HAPI_ParmInfo& parm,
+    std::vector<MString>& tagNames, std::vector<MString>& tagValues)
+{
+    tagNames.reserve(parm.tagCount);
+    tagValues.reserve(parm.tagCount);
+
+    for (int i = 0; i < parm.tagCount; i++)
+    {
+        HAPI_StringHandle tagNameSH;
+        HAPI_GetParmTagName(Util::theHAPISession.get(), myNodeInfo.id, parm.id,
+            i, &tagNameSH);
+
+        MString tagName = Util::HAPIString(tagNameSH);
+
+        HAPI_StringHandle tagValueSH;
+        HAPI_GetParmTagValue(Util::theHAPISession.get(), myNodeInfo.id, parm.id,
+            tagName.asChar(), &tagValueSH);
+
+        MString tagValue = Util::HAPIString(tagValueSH);
+
+        tagNames.emplace_back(tagName.toLowerCase());
+        tagValues.emplace_back(tagValue);
+    }
+}
+
+
 class CreateAttrOperation : public Util::WalkParmOperation
 {
 public:
-    CreateAttrOperation(MFnCompoundAttribute *attrFn,
-                        const HAPI_NodeInfo &nodeInfo);
+    CreateAttrOperation(MFnCompoundAttribute* attrFn,
+        const HAPI_NodeInfo& nodeInfo);
     ~CreateAttrOperation();
 
-    virtual void pushFolder(const HAPI_ParmInfo &parmInfo);
+    virtual void pushFolder(const HAPI_ParmInfo& parmInfo);
     virtual void popFolder();
 
-    virtual void pushMultiparm(const HAPI_ParmInfo &parmInfo);
+    virtual void pushMultiparm(const HAPI_ParmInfo& parmInfo);
     virtual void popMultiparm();
 
-    virtual void leaf(const HAPI_ParmInfo &parmInfo);
+    virtual void leaf(const HAPI_ParmInfo& parmInfo);
 
 private:
-    std::vector<MFnCompoundAttribute *> myAttrFns;
+    std::vector<MFnCompoundAttribute*> myAttrFns;
     std::vector<bool> myInvisibles;
-    std::vector<const HAPI_ParmInfo *> myParentParmInfos;
+    std::vector<const HAPI_ParmInfo*> myParentParmInfos;
 
-    const HAPI_NodeInfo &myNodeInfo;
+    const HAPI_NodeInfo& myNodeInfo;
 
-    MObject createStringAttr(const HAPI_ParmInfo &parm);
-    MObject createNumericAttr(const HAPI_ParmInfo &parm);
-    MObject createEnumAttr(const HAPI_ParmInfo &parm);
+    MObject createStringAttr(const HAPI_ParmInfo& parm);
+    MObject createNumericAttr(const HAPI_ParmInfo& parm);
+    MObject createEnumAttr(const HAPI_ParmInfo& parm);
 
-    void handleParmTags(const HAPI_ParmInfo &parm, MFnAttribute &attr,
-                        const MString attrName) const;
+    void handleParmTags(const HAPI_ParmInfo& parm, MFnAttribute& attr,
+        const MString attrName) const;
 };
 
-CreateAttrOperation::CreateAttrOperation(MFnCompoundAttribute *attrFn,
-                                         const HAPI_NodeInfo &nodeInfo)
+CreateAttrOperation::CreateAttrOperation(MFnCompoundAttribute* attrFn,
+    const HAPI_NodeInfo& nodeInfo)
     : myNodeInfo(nodeInfo)
 {
     myAttrFns.push_back(attrFn);
@@ -62,10 +89,10 @@ CreateAttrOperation::~CreateAttrOperation()
 }
 
 void
-CreateAttrOperation::pushFolder(const HAPI_ParmInfo &parmInfo)
+CreateAttrOperation::pushFolder(const HAPI_ParmInfo& parmInfo)
 {
-    MFnCompoundAttribute *attrFn = NULL;
-    bool invisible               = myInvisibles.back() || parmInfo.invisible;
+    MFnCompoundAttribute* attrFn = NULL;
+    bool invisible = myInvisibles.back() || parmInfo.invisible;
 
     // MFnCompoundAttribute* parentAttrFn = myAttrFns.back();
     // const HAPI_ParmInfo* &parentParmInfo = myParentParmInfos.back();
@@ -79,6 +106,21 @@ CreateAttrOperation::pushFolder(const HAPI_ParmInfo &parmInfo)
 
         attrFn->create(attrName, attrName);
         attrFn->setNiceNameOverride(niceName);
+
+        /*std::vector<MString> tagNames;
+        std::vector<MString> tagValues;
+
+        getParmTags(myNodeInfo, parmInfo, tagNames, tagValues);
+
+        MGlobal::displayInfo("Folder");
+        MGlobal::displayInfo( Util::HAPIString(parmInfo.nameSH));
+        for (size_t i = 0; i < tagNames.size(); i++)
+        {
+            MGlobal::displayInfo(tagNames[i]);
+            MGlobal::displayInfo(tagValues[i]);
+
+        }
+        MGlobal::displayInfo("");*/
     }
 
     myAttrFns.push_back(attrFn);
@@ -89,14 +131,14 @@ CreateAttrOperation::pushFolder(const HAPI_ParmInfo &parmInfo)
 void
 CreateAttrOperation::popFolder()
 {
-    MFnCompoundAttribute *attrFn = myAttrFns.back();
-    bool invisible               = myInvisibles.back();
+    MFnCompoundAttribute* attrFn = myAttrFns.back();
+    bool invisible = myInvisibles.back();
 
     myAttrFns.pop_back();
     myInvisibles.pop_back();
     myParentParmInfos.pop_back();
 
-    MFnCompoundAttribute *parentAttrFn = myAttrFns.back();
+    MFnCompoundAttribute* parentAttrFn = myAttrFns.back();
 
     if (!invisible)
     {
@@ -113,42 +155,28 @@ CreateAttrOperation::popFolder()
     }
 }
 
-static void getParmTags(const HAPI_NodeInfo &myNodeInfo, const HAPI_ParmInfo &parm,
-                        std::vector<MString> &tagNames, std::vector<MString> &tagValues)
-{
-    tagNames.reserve(parm.tagCount);
-    tagValues.reserve(parm.tagCount);
-
-    for (int i = 0; i < parm.tagCount; i++)
-    {
-        HAPI_StringHandle tagNameSH;
-        HAPI_GetParmTagName(Util::theHAPISession.get(), myNodeInfo.id, parm.id,
-                            i, &tagNameSH);
-
-        MString tagName = Util::HAPIString(tagNameSH);
-
-        HAPI_StringHandle tagValueSH;
-        HAPI_GetParmTagValue(Util::theHAPISession.get(), myNodeInfo.id, parm.id,
-                             tagName.asChar(), &tagValueSH);
-
-        MString tagValue = Util::HAPIString(tagValueSH);
-
-        tagNames.emplace_back(tagName.toLowerCase());
-        tagValues.emplace_back(tagValue);
-    }
-}
-
 void
-CreateAttrOperation::handleParmTags(const HAPI_ParmInfo &parm, MFnAttribute &attr,
-                                    const MString attrName) const
+CreateAttrOperation::handleParmTags(const HAPI_ParmInfo& parm, MFnAttribute& attr,
+    const MString attrName) const
 {
     std::vector<MString> tagNames;
     std::vector<MString> tagValues;
 
     getParmTags(myNodeInfo, parm, tagNames, tagValues);
 
+    /*if (parm.type == HAPI_PARMTYPE_MULTIPARMLIST)
+    {
+        MGlobal::displayInfo("MultiparmList");
+        MGlobal::displayInfo( Util::HAPIString(parm.nameSH));
+
+    }*/
     for (size_t i = 0; i < tagNames.size(); i++)
     {
+        if (parm.type == HAPI_PARMTYPE_MULTIPARMLIST)
+        {
+            MGlobal::displayInfo(tagNames[i] + " " + tagValues[i]);
+
+        }
         if (tagNames[i] == "sidefx::maya_component_selection_type")
         {
             // Parm supports component selection
@@ -163,8 +191,8 @@ CreateAttrOperation::handleParmTags(const HAPI_ParmInfo &parm, MFnAttribute &att
             else
             {
                 DISPLAY_WARNING("Unknown selection type \"^1s\" requested for "
-                                "\"^2s\". Valid types are: \"vertex\", \"edge\", "
-                                "\"face\" and \"uv\".\n", tagValues[i], attrName);
+                    "\"^2s\". Valid types are: \"vertex\", \"edge\", "
+                    "\"face\" and \"uv\".\n", tagValues[i], attrName);
             }
         }
         if (tagNames[i] == "sidefx::maya_parm_affects_others")
@@ -198,8 +226,8 @@ CreateAttrOperation::handleParmTags(const HAPI_ParmInfo &parm, MFnAttribute &att
             else
             {
                 DISPLAY_WARNING("Unknown callback function language: \"^1s\". "
-                                "Valid types are: \"mel\" and \"python\".\n",
-                                tag_ms);
+                    "Valid types are: \"mel\" and \"python\".\n",
+                    tag_ms);
                 continue;
             }
 
@@ -209,12 +237,12 @@ CreateAttrOperation::handleParmTags(const HAPI_ParmInfo &parm, MFnAttribute &att
 }
 
 void
-CreateAttrOperation::pushMultiparm(const HAPI_ParmInfo &parmInfo)
+CreateAttrOperation::pushMultiparm(const HAPI_ParmInfo& parmInfo)
 {
-    MFnCompoundAttribute *attrFn = NULL;
-    bool invisible               = myInvisibles.back() || parmInfo.invisible;
+    MFnCompoundAttribute* attrFn = NULL;
+    bool invisible = myInvisibles.back() || parmInfo.invisible;
 
-    MFnCompoundAttribute *parentAttrFn = myAttrFns.back();
+    MFnCompoundAttribute* parentAttrFn = myAttrFns.back();
     // const HAPI_ParmInfo* &parentParmInfo = myParentParmInfos.back();
 
     if (!invisible)
@@ -256,15 +284,15 @@ CreateAttrOperation::pushMultiparm(const HAPI_ParmInfo &parmInfo)
         else
         {
             attrName = Util::getAttrNameFromParm(parmInfo);
-            MString label    = Util::HAPIString(parmInfo.labelSH);
+            MString label = Util::HAPIString(parmInfo.labelSH);
 
             MFnNumericAttribute sizeAttrFn;
             sizeAttrFn.create(attrName + "__multiSize",
-                              attrName + "__multiSize", MFnNumericData::kInt);
+                attrName + "__multiSize", MFnNumericData::kInt);
             sizeAttrFn.setNiceNameOverride(label);
             parentAttrFn->addChild(sizeAttrFn.object());
 
-            attrFn                  = new MFnCompoundAttribute();
+            attrFn = new MFnCompoundAttribute();
             MObject compoundAttrObj = attrFn->create(attrName, attrName);
             attrFn->setNiceNameOverride(label);
             attrFn->setArray(true);
@@ -283,14 +311,14 @@ CreateAttrOperation::pushMultiparm(const HAPI_ParmInfo &parmInfo)
 void
 CreateAttrOperation::popMultiparm()
 {
-    MFnCompoundAttribute *attrFn = myAttrFns.back();
-    bool invisible               = myInvisibles.back();
+    MFnCompoundAttribute* attrFn = myAttrFns.back();
+    bool invisible = myInvisibles.back();
 
     myAttrFns.pop_back();
     myInvisibles.pop_back();
     myParentParmInfos.pop_back();
 
-    MFnCompoundAttribute *parentAttrFn = myAttrFns.back();
+    MFnCompoundAttribute* parentAttrFn = myAttrFns.back();
 
     if (!invisible)
     {
@@ -307,11 +335,11 @@ CreateAttrOperation::popMultiparm()
 }
 
 void
-CreateAttrOperation::leaf(const HAPI_ParmInfo &parmInfo)
+CreateAttrOperation::leaf(const HAPI_ParmInfo& parmInfo)
 {
-    MFnCompoundAttribute *attrFn         = myAttrFns.back();
-    bool invisible                       = myInvisibles.back();
-    const HAPI_ParmInfo *&parentParmInfo = myParentParmInfos.back();
+    MFnCompoundAttribute* attrFn = myAttrFns.back();
+    bool invisible = myInvisibles.back();
+    const HAPI_ParmInfo*& parentParmInfo = myParentParmInfos.back();
 
     // for multiparm, only build the first instance
     if (parmInfo.isChildOfMultiParm &&
@@ -332,12 +360,12 @@ CreateAttrOperation::leaf(const HAPI_ParmInfo &parmInfo)
         MObject attrObj;
 
         if ((parmInfo.type == HAPI_PARMTYPE_INT ||
-             parmInfo.type == HAPI_PARMTYPE_BUTTON ||
-             parmInfo.type == HAPI_PARMTYPE_STRING ||
-             parmInfo.type == HAPI_PARMTYPE_PATH_FILE ||
-             parmInfo.type == HAPI_PARMTYPE_PATH_FILE_DIR ||
-             parmInfo.type == HAPI_PARMTYPE_PATH_FILE_GEO ||
-             parmInfo.type == HAPI_PARMTYPE_PATH_FILE_IMAGE) &&
+            parmInfo.type == HAPI_PARMTYPE_BUTTON ||
+            parmInfo.type == HAPI_PARMTYPE_STRING ||
+            parmInfo.type == HAPI_PARMTYPE_PATH_FILE ||
+            parmInfo.type == HAPI_PARMTYPE_PATH_FILE_DIR ||
+            parmInfo.type == HAPI_PARMTYPE_PATH_FILE_GEO ||
+            parmInfo.type == HAPI_PARMTYPE_PATH_FILE_IMAGE) &&
             parmInfo.choiceCount > 0)
         {
             attrObj = createEnumAttr(parmInfo);
@@ -386,7 +414,7 @@ CreateAttrOperation::leaf(const HAPI_ParmInfo &parmInfo)
 }
 
 static void
-configureStringAttribute(MFnTypedAttribute &tAttr, const HAPI_ParmInfo &parm)
+configureStringAttribute(MFnTypedAttribute& tAttr, const HAPI_ParmInfo& parm)
 {
     if (HAPI_ParmInfo_IsPath(&parm))
     {
@@ -421,7 +449,7 @@ configureStringAttribute(MFnTypedAttribute &tAttr, const HAPI_ParmInfo &parm)
 }
 
 MObject
-CreateAttrOperation::createStringAttr(const HAPI_ParmInfo &parm)
+CreateAttrOperation::createStringAttr(const HAPI_ParmInfo& parm)
 {
     MFnTypedAttribute tAttr;
     MFnCompoundAttribute cAttr;
@@ -466,7 +494,7 @@ CreateAttrOperation::createStringAttr(const HAPI_ParmInfo &parm)
 }
 
 MObject
-CreateAttrOperation::createNumericAttr(const HAPI_ParmInfo &parm)
+CreateAttrOperation::createNumericAttr(const HAPI_ParmInfo& parm)
 {
     MString attrName = Util::getAttrNameFromParm(parm);
     MString niceName = Util::HAPIString(parm.labelSH);
@@ -559,7 +587,7 @@ CreateAttrOperation::createNumericAttr(const HAPI_ParmInfo &parm)
 }
 
 MObject
-CreateAttrOperation::createEnumAttr(const HAPI_ParmInfo &parm)
+CreateAttrOperation::createEnumAttr(const HAPI_ParmInfo& parm)
 {
     MString attrName = Util::getAttrNameFromParm(parm);
     MString niceName = Util::HAPIString(parm.labelSH);
@@ -570,10 +598,10 @@ CreateAttrOperation::createEnumAttr(const HAPI_ParmInfo &parm)
     eAttr.setStorable(true);
     eAttr.setNiceNameOverride(niceName);
 
-    HAPI_ParmChoiceInfo *choiceInfos =
+    HAPI_ParmChoiceInfo* choiceInfos =
         new HAPI_ParmChoiceInfo[parm.choiceCount];
     HAPI_GetParmChoiceLists(Util::theHAPISession.get(), myNodeInfo.id,
-                            choiceInfos, parm.choiceIndex, parm.choiceCount);
+        choiceInfos, parm.choiceIndex, parm.choiceCount);
 
     int enumIndex = 0;
 
@@ -595,7 +623,7 @@ CreateAttrOperation::createEnumAttr(const HAPI_ParmInfo &parm)
 }
 
 static void
-getConnectedChildrenPlugs(MPlugArray &connections, const MPlug &plug)
+getConnectedChildrenPlugs(MPlugArray& connections, const MPlug& plug)
 {
     std::vector<MPlug> plugsToTraverse;
     plugsToTraverse.push_back(plug);
@@ -647,7 +675,7 @@ getConnectedChildrenPlugs(MPlugArray &connections, const MPlug &plug)
 }
 
 static void
-unlockChildPlugs(MPlug &plug)
+unlockChildPlugs(MPlug& plug)
 {
     std::vector<MPlug> plugsToTraverse;
     plugsToTraverse.push_back(plug);
@@ -694,7 +722,7 @@ unlockChildPlugs(MPlug &plug)
     }
 }
 
-SyncAttribute::SyncAttribute(const MObject &assetNodeObj)
+SyncAttribute::SyncAttribute(const MObject& assetNodeObj)
     : SubCommandAsset(assetNodeObj)
 {
 }
@@ -709,7 +737,7 @@ SyncAttribute::doIt()
     GET_COMMAND_ASSET_OR_RETURN_FAIL();
 
     MFnDagNode assetNodeFn(myAssetNodeObj);
-    AssetNode *assetNode = dynamic_cast<AssetNode *>(assetNodeFn.userNode());
+    AssetNode* assetNode = dynamic_cast<AssetNode*>(assetNodeFn.userNode());
 
     MObject houdiniAssetParmObj =
         assetNodeFn.attribute(Util::getParmAttrPrefix());
@@ -727,13 +755,13 @@ SyncAttribute::doIt()
         getConnectedChildrenPlugs(connections, parmPlug);
         unlockChildPlugs(parmPlug);
 
-        MString connectAttrFormat      = "connectAttr ^1s ^2s;";
+        MString connectAttrFormat = "connectAttr ^1s ^2s;";
         unsigned int connectionsLength = connections.length();
         for (unsigned int i = 0; i < connectionsLength; i += 2)
         {
             MString connectAttrCmd;
             connectAttrCmd.format(connectAttrFormat, connections[i].name(),
-                                  connections[i + 1].name());
+                connections[i + 1].name());
             connectAttrCmds.append(connectAttrCmd);
         }
     }
@@ -751,7 +779,7 @@ SyncAttribute::doIt()
         std::vector<HAPI_ParmInfo> parmInfos;
         parmInfos.resize(nodeInfo.parmCount);
         HAPI_GetParameters(Util::theHAPISession.get(), nodeInfo.id,
-                           &parmInfos[0], 0, parmInfos.size());
+            &parmInfos[0], 0, parmInfos.size());
 
         // create root attribute
         MFnCompoundAttribute attrFn;
@@ -759,9 +787,9 @@ SyncAttribute::doIt()
             Util::getParmAttrPrefix(), Util::getParmAttrPrefix());
         attrFn.setInternal(true);
 
-        CreateAttrOperation operation(reinterpret_cast<MFnCompoundAttribute *>(
-                                          &reinterpret_cast<char &>(attrFn)),
-                                      nodeInfo);
+        CreateAttrOperation operation(reinterpret_cast<MFnCompoundAttribute*>(
+            &reinterpret_cast<char&>(attrFn)),
+            nodeInfo);
         Util::walkParm(parmInfos, operation);
 
         if (attrFn.numChildren())
