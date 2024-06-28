@@ -263,7 +263,7 @@ proc createPrimSelectionParm(string $attr, string $label, int $enable, string $a
         -attributeChange $attr ("textFieldGrp -e -text `getAttr " + $attr + "` \"" + $textField + "\"");
 }
 
-proc createStringParm(string $attr, string $attrName, string $label, int $enable, string $annotation, string $parmName) {
+proc createStringParm(string $attr, string $attrName, string $label, int $enable, string $annotation, string $parmName, string $selectionType) {
     string $textTypes[] = {
         "__info__", 
         "__warning__", 
@@ -279,6 +279,14 @@ proc createStringParm(string $attr, string $attrName, string $label, int $enable
     string $labelButton = "Edit";
     string $annotationButton = "Edit text field.";
 
+    if ($selectionType == "info") {
+        $iconIndex = 0;
+        $isEditable = 0;
+        $labelButton = "Read";
+        $annotationButton = "Open text field window.";
+    }
+
+    /*
     for ($i = 0; $i < size($textTypes); $i++) {
         if (endsWith($parmName, $textTypes[$i])) {
             $iconIndex = $i;
@@ -287,7 +295,7 @@ proc createStringParm(string $attr, string $attrName, string $label, int $enable
             $annotationButton = "Open text field window.";
             break;
         }
-    }
+    }*/
 
     string $text = `getAttr $attr`;
 
@@ -482,17 +490,21 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
             
             } else if ($type == "string") {
                 string $supportedSelectionTypes[] = {"vertex", "face", "edge", "uv"};
-                
+                string $supportedStringTypes[] = {"info"};
+
                 string $selectionType = "";
                 int $selectionIndex = -1;
                 int $treatAsSelection = false;
 
+                string $stringType = "";
+
                 // See if we need to handle this string parm differently
                 for ($category in $categories) {
-                    string $prefix = "hapiParmString_select";
+                    string $prefixSelection = "hapiParmSelect_";
+                    string $prefixString = "hapiParmString_";
 
-                    if (startsWith($category, $prefix)) {
-                        $selectionType = tolower(stringRemovePrefix($category, $prefix));
+                    if (startsWith($category, $prefixSelection)) {
+                        $selectionType = stringRemovePrefix($category, $prefixSelection);
                         $selectionIndex = stringArrayFind($selectionType, 0, $supportedSelectionTypes);
 
                         if ($selectionIndex >= 0) {
@@ -500,6 +512,9 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                             // We don't support multiple selection types, so bail out here.
                             break;
                         }
+                    } else if (startsWith($category, $prefixString)) {
+                        $stringType = stringRemovePrefix($category, $prefixString);
+                        break;
                     }
                 }
 
@@ -507,7 +522,7 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                     createPrimSelectionParm($plug, $niceName, $isEnabled, $parmHelp, $selectionType, $selectionIndex);
 
                 } else {
-                    createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName);
+                    createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName, $stringType);
                 }
             } else {
                 attrControlGrp 

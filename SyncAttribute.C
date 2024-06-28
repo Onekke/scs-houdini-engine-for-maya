@@ -177,17 +177,22 @@ CreateAttrOperation::handleParmTags(const HAPI_ParmInfo& parm, MFnAttribute& att
             MGlobal::displayInfo(tagNames[i] + " " + tagValues[i]);
 
         }
+        if (tagNames[i] == "sidefx::maya_string_type")
+        {
+            if (tagValues[i] == "info")
+                attr.addToCategory("hapiParmString_info");
+        }
         if (tagNames[i] == "sidefx::maya_component_selection_type")
         {
             // Parm supports component selection
             if (tagValues[i] == "vertex")
-                attr.addToCategory("hapiParmString_selectVertex");
+                attr.addToCategory("hapiParmSelect_vertex");
             else if (tagValues[i] == "edge")
-                attr.addToCategory("hapiParmString_selectEdge");
+                attr.addToCategory("hapiParmSelect_edge");
             else if (tagValues[i] == "face")
-                attr.addToCategory("hapiParmString_selectFace");
+                attr.addToCategory("hapiParmSelect_face");
             else if (tagValues[i] == "uv")
-                attr.addToCategory("hapiParmString_selectUV");
+                attr.addToCategory("hapiParmSelect_uv");
             else
             {
                 DISPLAY_WARNING("Unknown selection type \"^1s\" requested for "
