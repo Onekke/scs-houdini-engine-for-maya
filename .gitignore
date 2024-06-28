@@ -4,4 +4,4 @@ icons/Thumbs.db
 .vscode/settings.json
 
 build/
-plug-ins/
+plug-ins*
