@@ -106,7 +106,10 @@ CreateAttrOperation::pushFolder(const HAPI_ParmInfo& parmInfo)
 
         attrFn->create(attrName, attrName);
         attrFn->setNiceNameOverride(niceName);
-
+        if (attrName.indexW("__open__") == -1)
+        {
+            attrFn->addToCategory("default_close");
+        }
         /*std::vector<MString> tagNames;
         std::vector<MString> tagValues;
 

@@ -532,8 +532,16 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
             }
 
         } else if($isCompound && !$isMulti) {
-            int $collapsed = (`match "__open__" $parmName` == "__open__") ? 0 : 1;
+            int $collapsed = 0;
 
+            for ($category in $categories) 
+            {
+                if ($category == "default_close")
+                {
+                    $collapsed = 1;
+                }
+            }
+          
             float $color = 0.23;
 
             if (`match "__lv1__" $parmName` == "__lv1__") {
