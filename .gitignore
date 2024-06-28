@@ -5,3 +5,6 @@ icons/Thumbs.db
 
 /build
 /plug-ins
+plug-ins/houdiniEngine.exp
+plug-ins/houdiniEngine.lib
+plug-ins/houdiniEngine.mll
