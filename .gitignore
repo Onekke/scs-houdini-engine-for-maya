@@ -3,5 +3,5 @@ build-maya*
 icons/Thumbs.db
 .vscode/settings.json
 
-build/
-plug-ins*
+/build
+/plug-ins
