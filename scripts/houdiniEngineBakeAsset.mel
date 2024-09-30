@@ -26,16 +26,21 @@ houdiniEngine_bakeAsset(string $assetNode)
             }
         }
         if($hasShape) {
-            if( `getAttr ($assetNode + ".ungroupOnBake")`)
+            if( `getAttr ($assetNode + ".ungroupOnBake")`) {
                 ungroup -a -w $child;
-            else
+            } else {
+                print($child + "/n");
                 parent -a -w  $child;
+            }
         }
         else
             delete $child;
     }
 
     refresh;
+
+    python("from houdiniEnginePrismExporter import create_node_hierarchy; " + 
+                                 "create_node_hierarchy()");
 
     //string $outputObjCon[] = `listConnections -p on ($assetNode + ".outputObjects")`;
     //for($con in $outputObjCon) {

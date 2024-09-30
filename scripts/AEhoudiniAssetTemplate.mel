@@ -3,9 +3,9 @@ source houdiniEngineAssetInput;
 source houdiniEngineHistoryAsset;
 source houdiniEngineBakeAsset;
 
-global int $gAttributeEditorTemplateLabelWidthCustom = 147;
+global int $gAttributeEditorTemplateLabelWidthCustom = 148;
 
-global proc AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug) {
+global proc AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug, int $fileModeOverride) {
     string $categories[] = `addAttr -q -category ($plug)`;
 
     string $fileFilter = "*.*(*.*)";
@@ -19,7 +19,7 @@ global proc AEhoudiniAssetTemplate_fileAttributeBrowse(string $plug) {
         }
     }
 
-    int $fileMode = 4;
+    int $fileMode = $fileModeOverride;
     if(stringArrayFind("hapiParmFile_read", 0, $categories) != -1)
         $fileMode = 4;
     else if(stringArrayFind("hapiParmFile_write", 0, $categories) != -1)
@@ -163,21 +163,31 @@ proc createInputWidget(string $attr, string $label) {
 proc createButtonParm(string $attr, string $label, int $enable, string $annotation) {
     global int $gAttributeEditorTemplateLabelWidthCustom;
     
-    columnLayout
-        -height 27
-        -columnAttach "both" $gAttributeEditorTemplateLabelWidthCustom;
+    rowLayout
+        -height 26
+        -numberOfColumns 3
+        -adjustableColumn1 3;
         
+        separator -style "none" -backgroundColor 0.285 0.285 0.285 -width 136;
+
         button
             -enable $enable
-            -height 20 -width 148
+            -height 20 -width 136
             -label $label 
             -command ("setAttr " + $attr + " 1")
             -annotation $annotation;
+
+        separator -style "none" -backgroundColor 0.285 0.285 0.285;
         
         setParent ..;
 }
 
-proc createFileInputStringParm(string $attr, string $label, int $enable, string $annotation) {
+proc createFileInputStringParm(string $attr, string $label, int $enable, string $annotation, int $fileModeOverride) {
+    string $buttonIcon = "fileOpen.png";
+    if ($fileModeOverride == 4) {
+        $buttonIcon = "fileNew.png";
+    }
+
     string $text = `getAttr $attr`;
 
     rowLayout
@@ -196,7 +206,7 @@ proc createFileInputStringParm(string $attr, string $label, int $enable, string 
             -enable $enable
             -height 20 -width 20
             -style "iconOnly" 
-            -image "fileOpen.png"
+            -image $buttonIcon
             -label "Open File" 
             -annotation "Open file browser."`;
 
@@ -207,7 +217,7 @@ proc createFileInputStringParm(string $attr, string $label, int $enable, string 
         $textField;
 
     iconTextButton -e 
-        -command ("AEhoudiniAssetTemplate_fileAttributeBrowse \"" + $attr + "\"")
+        -command ("AEhoudiniAssetTemplate_fileAttributeBrowse \"" + $attr + "\" " + $fileModeOverride)
         $iconTextButton;
 
     scriptJob
@@ -263,7 +273,7 @@ proc createPrimSelectionParm(string $attr, string $label, int $enable, string $a
         -attributeChange $attr ("textFieldGrp -e -text `getAttr " + $attr + "` \"" + $textField + "\"");
 }
 
-proc createStringParm(string $attr, string $attrName, string $label, int $enable, string $annotation, string $parmName, string $selectionType) {
+proc createStringParm(string $attr, string $attrName, string $label, int $enable, string $annotation, string $parmName) {
     string $textTypes[] = {
         "__info__", 
         "__warning__", 
@@ -279,14 +289,6 @@ proc createStringParm(string $attr, string $attrName, string $label, int $enable
     string $labelButton = "Edit";
     string $annotationButton = "Edit text field.";
 
-    if ($selectionType == "info") {
-        $iconIndex = 0;
-        $isEditable = 0;
-        $labelButton = "Read";
-        $annotationButton = "Open text field window.";
-    }
-
-    /*
     for ($i = 0; $i < size($textTypes); $i++) {
         if (endsWith($parmName, $textTypes[$i])) {
             $iconIndex = $i;
@@ -295,7 +297,7 @@ proc createStringParm(string $attr, string $attrName, string $label, int $enable
             $annotationButton = "Open text field window.";
             break;
         }
-    }*/
+    }
 
     string $text = `getAttr $attr`;
 
@@ -454,9 +456,9 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
             separator -height 12 -style "none" -backgroundColor 0.285 0.285 0.285;
             continue;
         }
-        
+
         string $plug = $fullAttrName + "." + $child;
-        
+
         // get info about parm
         string $type = `getAttr -type $plug`;
         
@@ -486,25 +488,21 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
         
         } else if($isSimpleAttribute) {
             if (`addAttr -q -usedAsFilename $plug`) {   
-                createFileInputStringParm($plug, $niceName, $isEnabled, $parmHelp);
+                createFileInputStringParm($plug, $niceName, $isEnabled, $parmHelp, 0);
             
             } else if ($type == "string") {
                 string $supportedSelectionTypes[] = {"vertex", "face", "edge", "uv"};
-                string $supportedStringTypes[] = {"info"};
-
+                
                 string $selectionType = "";
                 int $selectionIndex = -1;
                 int $treatAsSelection = false;
 
-                string $stringType = "";
-
                 // See if we need to handle this string parm differently
                 for ($category in $categories) {
-                    string $prefixSelection = "hapiParmSelect_";
-                    string $prefixString = "hapiParmString_";
+                    string $prefix = "hapiParmString_select";
 
-                    if (startsWith($category, $prefixSelection)) {
-                        $selectionType = stringRemovePrefix($category, $prefixSelection);
+                    if (startsWith($category, $prefix)) {
+                        $selectionType = tolower(stringRemovePrefix($category, $prefix));
                         $selectionIndex = stringArrayFind($selectionType, 0, $supportedSelectionTypes);
 
                         if ($selectionIndex >= 0) {
@@ -512,9 +510,6 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                             // We don't support multiple selection types, so bail out here.
                             break;
                         }
-                    } else if (startsWith($category, $prefixString)) {
-                        $stringType = stringRemovePrefix($category, $prefixString);
-                        break;
                     }
                 }
 
@@ -522,13 +517,22 @@ proc buildAttrTree(string $nodeName, string $attr, string $fullAttr)
                     createPrimSelectionParm($plug, $niceName, $isEnabled, $parmHelp, $selectionType, $selectionIndex);
 
                 } else {
-                    createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName, $stringType);
+                    // When session type is set to socket File and Folder type parms are treated as ordered menu ???
+                    // Hence, the quick workaround this problem is to add __file__ or __dir__ suffix at the end of the file or folder parm.
+                    // And use custom string parm with Action Button in Houdini.
+                    if (endsWith($parmName, "__file__")) {
+                        createFileInputStringParm($plug, $niceName, $isEnabled, $parmHelp, 4);
+                    } else if (endsWith($parmName, "__dir__")) {
+                        createFileInputStringParm($plug, $niceName, $isEnabled, $parmHelp, 3);
+                    } else {
+                        createStringParm($plug, ($nodeName + "." + $child), $niceName, $isEnabled, $parmHelp, $parmName);
+                    }
                 }
             } else {
                 attrControlGrp 
-                    -attribute $plug
-                    -annotation $parmHelp
-                    -enable $isEnabled;
+                -attribute $plug
+                -annotation $parmHelp
+                -enable $isEnabled;
             }
 
         } else if($isCompound && !$isMulti) {
@@ -797,14 +801,17 @@ global proc AEhoudiniAssetSetInputToText(string $textField, string $inputAttr) {
     }
 }
 
-global proc AEhoudiniAssetInputsNew(string $inputsAttribute) {
-    columnLayout -adj true "inputsLayout";
+global proc AEhoudiniAssetInputsNew(string $houdiniAssetInputsAttribute) {
+    columnLayout -adjustableColumn 1 
+        //-rowSpacing 2
+        "inputsLayout";
+
     setParent ..;
 
-    AEhoudiniAssetInputsReplace $inputsAttribute;
+    AEhoudiniAssetInputsReplace $houdiniAssetInputsAttribute;
 }
 
-global proc AEhoudiniAssetInputsReplace(string $inputsAttribute) {
+global proc AEhoudiniAssetInputsReplace(string $houdiniAssetInputsAttribute) {
     string $parent = `setParent -q`;
     string $inputsLayoutFull = $parent + "|inputsLayout";
 
@@ -818,20 +825,14 @@ global proc AEhoudiniAssetInputsReplace(string $inputsAttribute) {
 
     setParent $inputsLayoutFull;
 
-    int $multiIndices[] = `getAttr -multiIndices $inputsAttribute`;
-    for($i=0; $i < size($multiIndices); $i++)
-    {
+    int $multiIndices[] = `getAttr -multiIndices $houdiniAssetInputsAttribute`;
+    for($i=0; $i < size($multiIndices); $i++) {
         int $index = $multiIndices[$i];
-        string $inputAttribute = $inputsAttribute + "[" + $index + "]";
+        string $inputAttribute = $houdiniAssetInputsAttribute + "[" + $index + "]";
 
         string $inputName = `getAttr ($inputAttribute + ".inputName")`;
-
+        
         createInputWidget($inputAttribute + ".inputNodeId", $inputName);
-
-        if($i < size($multiIndices) - 1)
-        {
-            separator -height 12 -style "in";
-        }
     }
 
     setParent ..;
@@ -990,13 +991,15 @@ global proc AEhoudiniAssetOptionsNew(string $attr) {
             separator -height 12 -style "in";
 
             button 
-                -height 27
+                -height 20
                 -label "Show Cook Messages"
                 -annotation "Show the cook messages that were generated from the cook."
                 showCookMessagesButton;
 
+            separator -height 4 -style "none" -backgroundColor 0.285 0.285 0.285;
+
             button
-                -height 27 
+                -height 20 
                 -label "Reset Simulation"
                 -annotation "Resets all the simulation caches."
                 resetSimulationButton;
@@ -1173,6 +1176,16 @@ global proc AEhoudiniAssetTemplate(string $nodeName) {
     editorTemplate -endLayout;
 
     editorTemplate -beginScrollLayout;
+
+        // sop node inputs
+        string $inputAttrArray[] = `listAttr -st "input" $nodeName`;
+        string $inputAttr = $inputAttrArray[0];
+        if($inputAttr != "") {
+            editorTemplate -beginLayout "Asset Inputs" -collapse false;
+                editorTemplate -callCustom "AEhoudiniAssetInputsNew" "AEhoudiniAssetInputsReplace"
+                $inputAttr;
+            editorTemplate -endLayout;
+        }
     
         editorTemplate -beginLayout "Asset Parameters" -collapse false;
             editorTemplate -callCustom "AEhoudiniAssetParmNew" "AEhoudiniAssetParmReplace" "houdiniAssetParm";
